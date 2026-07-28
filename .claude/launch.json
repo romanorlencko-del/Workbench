@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "workbench",
+      "runtimeExecutable": "py",
+      "runtimeArgs": ["-3.12", "C:\\Users\\user\\Desktop\\Workbench\\serve.py"],
+      "port": 8791
+    }
+  ]
+}

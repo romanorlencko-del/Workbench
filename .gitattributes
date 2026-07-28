@@ -1,2 +1,7 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# По умолчанию весь текст нормализуем к LF (кроссплатформенно, стабильные диффы).
+* text=auto eol=lf
+# Скрипты оболочки — обязательно LF, иначе на Unix ломается shebang.
+*.sh    text eol=lf
+# Скрипты Windows — CRLF.
+*.bat   text eol=crlf
+*.ps1   text eol=crlf

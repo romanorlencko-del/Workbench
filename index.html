@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Workbench — конструктор конвейеров</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+
+  <header class="topbar">
+    <button class="tb icon drawer-btn" data-act="toggle-palette" title="Блоки" aria-label="Открыть блоки">☰</button>
+    <div class="brand">
+      <span class="brand-mark">◇</span>
+      <span class="brand-name">WORKBENCH</span>
+      <span class="brand-sub">конструктор конвейеров</span>
+    </div>
+
+    <div class="project-bar">
+      <div class="projdrop" id="projdrop">
+        <button class="tb projdrop-btn" data-act="proj-toggle" title="Проекты — клик выбрать, ✎ переименовать">
+          <span id="projdrop-name" class="projdrop-name">Проект</span><span class="projdrop-caret">▾</span>
+        </button>
+        <div class="projdrop-list" id="projdrop-list" hidden></div>
+      </div>
+      <button class="tb icon" data-act="project-dup" title="Дублировать проект">⧉</button>
+      <button class="tb icon" data-act="project-del" title="Удалить текущий проект">🗑</button>
+    </div>
+
+    <input id="pipeline-name" class="pipeline-name" spellcheck="false" value="Новый конвейер">
+
+    <div class="toolbar">
+      <button class="tb" data-act="new"    title="Новый проект">＋ <span class="lbl-txt">Проект</span></button>
+      <button class="tb" data-act="import" title="Импорт JSON">↧ <span class="lbl-txt">Импорт</span></button>
+      <button class="tb" data-act="export" title="Экспорт JSON (Ctrl+S)">↥ <span class="lbl-txt">Экспорт</span></button>
+      <span class="tb-sep"></span>
+      <button class="tb icon" data-act="undo" title="Отменить (Ctrl+Z)">↺</button>
+      <button class="tb icon" data-act="redo" title="Вернуть (Ctrl+Shift+Z)">↻</button>
+      <span class="tb-sep"></span>
+      <div class="viewswitch">
+        <button class="tb vsw on" data-act="view-graph"   title="Свободный холст">◻ <span class="lbl-txt">Холст</span></button>
+        <button class="tb vsw"    data-act="view-harness" title="Жгут: шины по категориям (H)">⌇ <span class="lbl-txt">Жгут</span></button>
+      </div>
+      <span class="tb-sep"></span>
+      <button class="tb icon" data-act="layout" title="Разложить схему по слоям (L)">⌗</button>
+      <button class="tb icon" data-act="fit"  title="Вместить всё (F)">⛶</button>
+      <button class="tb icon" data-act="grid" title="Привязка к сетке">▦</button>
+      <button class="tb icon" data-act="collide" title="Коллизии: блоки не налезают, провода огибают">⧉</button>
+      <span class="tb-sep"></span>
+      <button class="tb" data-act="guide" title="Инструкция и бриф для ИИ">✦ <span class="lbl-txt">ИИ</span></button>
+      <button class="tb" data-act="check" title="Проверить конвейер">✓ <span class="lbl-txt">Проверить</span></button>
+      <button class="tb primary" data-act="run" title="Прогон плана">▶ Прогон</button>
+      <button class="tb icon drawer-btn" data-act="toggle-inspector" title="Параметры" aria-label="Открыть параметры">⚙</button>
+    </div>
+  </header>
+
+  <aside class="panel palette">
+    <div class="panel-head">
+      <span class="micro">Блоки</span>
+      <input id="palette-search" class="search" placeholder="поиск…" spellcheck="false">
+      <button class="tb icon" data-act="palette-min" id="palette-min" title="Свернуть блоки влево">«</button>
+      <button class="tb icon drawer-close" data-act="close-drawers" title="Закрыть">✕</button>
+    </div>
+    <div id="palette-list" class="palette-list"></div>
+    <div class="palette-foot micro">перетащи блок на холст&nbsp;· или клик
+      <button class="linkbtn" data-act="load-pipeline">загрузить конвейер проекта</button>
+      <button class="linkbtn dim" data-act="demo" title="Сам Workbench, описанный своими блоками">схема конструктора</button>
+    </div>
+    <button class="pal-rail" data-act="palette-min" title="Развернуть блоки">
+      <span class="pal-rail-ico">☰</span><span class="pal-rail-txt">Блоки</span>
+    </button>
+  </aside>
+
+  <main class="stage" id="stage">
+    <div class="viewport" id="viewport">
+      <svg class="edge-layer" id="edges" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="node-layer" id="nodes"></div>
+      <div class="harness-layer" id="harness">
+        <svg class="harness-wires" id="harness-wires" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="harness-chips" id="harness-chips"></div>
+      </div>
+    </div>
+
+    <div class="marquee" id="marquee" hidden></div>
+
+    <div class="stage-hud">
+      <div class="zoombox">
+        <button class="hud-btn" data-act="zoom-out">−</button>
+        <button class="hud-btn zoom-val" data-act="zoom-reset" id="zoom-val">100%</button>
+        <button class="hud-btn" data-act="zoom-in">+</button>
+      </div>
+      <div class="hints micro">
+        <b>трекпад / колесо</b> панорама · <b>Ctrl+колесо, щипок</b> зум · <b>ПКМ / пробел</b> тянуть холст ·
+        <b>тяни порт</b> связь · <b>Del</b> удалить · <b>Ctrl+D</b> дубль
+      </div>
+    </div>
+
+    <div class="quickadd" id="quickadd" hidden>
+      <div class="qa-top">
+        <input class="qa-search" id="qa-search" placeholder="блок…" spellcheck="false">
+        <button class="qa-close" data-qa-close title="Закрыть (Esc · ПКМ · клик мимо)">✕</button>
+      </div>
+      <div class="qa-list" id="qa-list"></div>
+    </div>
+  </main>
+
+  <aside class="panel inspector" id="inspector">
+    <div class="panel-head"><span class="micro">Параметры</span><span id="insp-badge" class="badge"></span><button class="tb icon" data-act="inspector-min" id="inspector-min" title="Свернуть параметры вправо">»</button><button class="tb icon drawer-close" data-act="close-inspector" title="Закрыть">✕</button></div>
+    <div id="insp-body" class="insp-body"></div>
+    <button class="insp-rail" data-act="inspector-min" title="Развернуть параметры">
+      <span class="pal-rail-ico">☰</span><span class="pal-rail-txt">Параметры</span>
+    </button>
+  </aside>
+
+  <footer class="console" id="console">
+    <div class="console-hdrag" id="console-hdrag" title="Тянуть — высота консоли · двойной клик — сбросить"></div>
+    <div class="console-tabs">
+      <button class="ctab active" data-tab="plan">Очередь выполнения</button>
+      <button class="ctab" data-tab="check">Проверка <span id="check-count" class="pill"></span></button>
+      <button class="ctab" data-tab="json">JSON</button>
+      <div class="console-actions">
+        <button class="tb icon" data-act="console-toggle" id="console-toggle" title="Свернуть">▾</button>
+      </div>
+    </div>
+    <div class="console-body">
+      <div class="ctab-panel active" id="tab-plan"></div>
+      <div class="ctab-panel" id="tab-check"></div>
+      <div class="ctab-panel" id="tab-json"></div>
+    </div>
+  </footer>
+
+  <!-- чат с ИИ: отдельное плавающее окно справа, тянется за левый/верхний край -->
+  <section class="chatdock" id="chat" hidden>
+    <div class="cd-edge cd-w" id="cd-w" title="Тянуть — ширина"></div>
+    <div class="cd-edge cd-h" id="cd-h" title="Тянуть — высота"></div>
+    <div class="cd-corner" id="cd-c" title="Тянуть — размер"></div>
+    <div class="chat-head">
+      <span class="chat-title">✦ Чат с ИИ</span>
+      <select id="chat-model" class="chat-model" title="Какая модель отвечает"></select>
+      <button class="tb" data-act="chat-compact" title="Сжать разговор в короткую сводку — контекст экономится, суть остаётся">сжать</button>
+      <button class="tb" data-act="chat-clear" title="Очистить историю чата (проект ИИ по-прежнему видит)">очистить</button>
+      <button class="tb icon" data-act="chat-min" id="chat-min" title="Свернуть в заголовок">─</button>
+      <button class="tb icon" data-act="chat-close" title="Закрыть (вернуть кнопкой справа внизу)">✕</button>
+    </div>
+    <div class="chat-log" id="chat-log"></div>
+    <form class="chat-input" id="chat-form">
+      <textarea id="chat-text" rows="2" placeholder="спроси ИИ или попроси изменить план…  (Enter — отправить, Shift+Enter — перенос)" spellcheck="false"></textarea>
+      <button class="tb primary" type="submit" id="chat-send" title="Отправить (Enter)">↑</button>
+    </form>
+  </section>
+  <button class="chat-launcher" id="chat-launcher" data-act="chat-open" title="Чат с ИИ">✦ <span class="cl-txt">Чат с ИИ</span></button>
+
+  <div class="drawer-scrim" id="drawer-scrim" data-act="close-drawers" hidden></div>
+
+  <div class="guide-modal" id="guide" hidden>
+    <div class="guide-scrim" data-act="close-guide"></div>
+    <div class="guide-card" role="dialog" aria-label="Инструкция для ИИ">
+      <div class="guide-head">
+        <span class="guide-title">✦ ИИ · как дорабатывать план</span>
+        <button class="tb icon" data-act="close-guide" title="Закрыть">✕</button>
+      </div>
+      <div class="guide-body">
+        <section class="guide-sec">
+          <h4>Шпаргалка</h4>
+          <ul class="guide-list">
+            <li><b>Узел = шаг</b> (его параметры — ТЗ шага), <b>ребро = связь</b>. Порядок по потоку = порядок сборки.</li>
+            <li>Порты двух видов: <b>flow</b> (сплошная — порядок выполнения) и <b>data</b> (пунктир — знания/контекст). Соединять можно только <b>одинаковые</b>.</li>
+            <li>Правка экономно: меняй минимум → верни <b>весь план минифицированным JSON</b> → кнопка <b>Импорт (↥)</b>. <code>id</code> держи стабильными, <code>meta.rev</code> +1, затем <b>⌗</b> разложит.</li>
+            <li>Полный каталог блоков и схема JSON — файл <b>AI_GUIDE.md</b> в проекте (и в брифе ниже).</li>
+          </ul>
+        </section>
+        <section class="guide-sec">
+          <h4>Подключение ИИ · локальный / облачный</h4>
+          <div id="guide-models"></div>
+          <div class="guide-row">
+            <button class="tb primary" data-act="guide-save-models">Сохранить подключения</button>
+            <button class="tb" data-act="guide-apply-all" title="Записать это подключение во все проекты и сделать дефолтом">Применить ко всем проектам</button>
+            <span class="micro dim">сохраняется в этот проект <b>и как подключение по умолчанию</b> для новых · ключ хранится отдельно, в план идёт только имя env-переменной (<code>api_key_env</code>)</span>
+          </div>
+        </section>
+        <section class="guide-sec">
+          <h4>Бриф для ИИ</h4>
+          <p class="micro dim">Сжатые правила + текущий план минифицированным JSON. Вставь в Hermes-агента или локальный ИИ — он вернёт обновлённый JSON, ты импортируешь через ↥.</p>
+          <button class="tb primary" data-act="guide-copy-brief">⧉ Скопировать бриф</button>
+        </section>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<input type="file" id="file-input" accept=".json,application/json" hidden>
+
+<script>
+/* Грузим скрипты с меткой времени: без сборщика браузер иначе отдаёт старый js
+   после правок. async=false сохраняет порядок выполнения. */
+['js/blocks.js', 'js/example.js', 'js/pipeline.js', 'js/graph.js',
+ 'js/collide.js', 'js/harness.js', 'js/editor.js', 'js/inspector.js', 'js/app.js'].forEach(src => {
+  const s = document.createElement('script');
+  s.src = src + '?t=' + Date.now();
+  s.async = false;
+  document.head.appendChild(s);
+});
+</script>
+</body>
+</html>

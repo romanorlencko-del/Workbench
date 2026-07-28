@@ -1,0 +1,46 @@
+name: build-release
+
+# Собирает Windows .exe и прикладывает его к GitHub Release при пуше тега vX.Y.Z.
+# Ручной прогон (workflow_dispatch) просто собирает артефакт для проверки.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows-exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install PyInstaller
+        run: python -m pip install --upgrade pyinstaller
+
+      - name: Build Workbench.exe
+        run: >
+          python -m PyInstaller --noconfirm --onefile --name Workbench
+          --hidden-import chat_proxy
+          --add-data "index.html;."
+          --add-data "AI_GUIDE.md;."
+          --add-data "css;css"
+          --add-data "js;js"
+          serve.py
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Workbench-windows
+          path: dist/Workbench.exe
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Workbench.exe

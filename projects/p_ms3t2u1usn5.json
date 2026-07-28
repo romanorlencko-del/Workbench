@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "name": "Новый конвейер",
+  "meta": {
+    "description": "",
+    "workdir": "",
+    "max_parallel": 4,
+    "log_level": "info",
+    "stage": "plan",
+    "input_reserve_tokens": 8000,
+    "models": {
+      "primary": {
+        "label": "Основная",
+        "provider": "openai-compatible",
+        "base_url": "https://api.gonka24.com/v1",
+        "model": "qwen3-235b",
+        "api_key_env": "GONKA_API_KEY",
+        "context_tokens": 160000,
+        "max_output_tokens": 16384
+      },
+      "heavy": {
+        "label": "Тяжёлая",
+        "provider": "openai-compatible",
+        "model": "glm-5.2",
+        "api_key_env": "GLM_API_KEY",
+        "context_tokens": 1000000,
+        "max_output_tokens": 32768
+      }
+    }
+  },
+  "nodes": [],
+  "edges": [],
+  "seq": 1
+}

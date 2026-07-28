@@ -1,0 +1,15 @@
+# Запуск:  docker compose up --build
+# Открыть: http://localhost:8791
+services:
+  workbench:
+    build: .
+    image: workbench
+    container_name: workbench
+    ports:
+      # ТОЛЬКО loopback хоста — приложение не торчит в сеть. Уберите "127.0.0.1:",
+      # только если сознательно открываете доступ другим машинам.
+      - "127.0.0.1:8791:8791"   # статика конструктора + /api (сохранение планов)
+      - "127.0.0.1:8792:8792"   # прокси ИИ-чата (обход CORS к LLM-провайдеру)
+    volumes:
+      - ./projects:/app/projects   # планы переживают пересборку контейнера
+    restart: unless-stopped

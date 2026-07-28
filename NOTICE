@@ -1,0 +1,7 @@
+Workbench — визуальный конструктор конвейеров
+Copyright 2026 Workbench authors
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Проект использует только стандартную библиотеку Python и не включает
+сторонний код. Никаких вендоренных зависимостей нет.

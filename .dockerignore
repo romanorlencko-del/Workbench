@@ -1,0 +1,15 @@
+.git
+.github
+__pycache__
+*.pyc
+*.pyo
+dist
+build
+*.spec
+.venv
+venv
+node_modules
+*.tmp
+projects/*.tmp
+.DS_Store
+Thumbs.db

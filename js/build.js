@@ -29,7 +29,11 @@ window.Build = (function () {
   /* Запись узла. target/checks/owner — «где это в коде и чем доказать, что готово»;
      журнал короткий и обрезается: он для следа работы, не для аудита.
      spec_rev/deps/spec_at — слепок плана, по которому узел строили. */
-  const DEFAULT = { status: 'todo', target: [], checks: '', owner: '', log: [], updatedAt: 0,
+  /* checks_ok — результат последнего прогона проверок: true / false / null,
+     если не гоняли. Без него «готово» остаётся утверждением исполнителя, а не
+     фактом: команда записана, но никто не знает, зелёная ли она. */
+  const DEFAULT = { status: 'todo', target: [], checks: '', checks_ok: null, checks_at: 0, checks_out: '',
+                    owner: '', log: [], updatedAt: 0,
                     spec_rev: '', deps: {}, spec_at: 0 };
   const LOG_MAX = 20;
 
@@ -48,6 +52,9 @@ window.Build = (function () {
         status: statusOk(r.status) ? r.status : DEFAULT.status,
         target: (Array.isArray(r.target) ? r.target : []).map(String).filter(Boolean),
         checks: String(r.checks || ''),
+        checks_ok: r.checks_ok === true ? true : r.checks_ok === false ? false : null,
+        checks_at: Number(r.checks_at) || 0,
+        checks_out: String(r.checks_out || '').slice(0, 2000),   // хвост вывода, не весь лог
         owner: String(r.owner || ''),
         log: (Array.isArray(r.log) ? r.log : []).filter(e => e && e.text).slice(0, LOG_MAX)
              .map(e => ({ ts: +e.ts || 0, text: String(e.text) })),
@@ -234,6 +241,11 @@ window.Build = (function () {
   function set(nodeId, patch) {
     if (!pid || !nodeId) return null;
     const prev = get(nodeId), now = Date.now();
+    /* Поменяли саму команду проверки — прошлый результат больше ни о чём не
+       говорит: он про другую команду. Сбрасываем, если в этой же правке не
+       пришёл новый результат. */
+    if (patch.checks !== undefined && patch.checks !== prev.checks && patch.checks_ok === undefined)
+      patch = Object.assign({}, patch, { checks_ok: null, checks_at: 0, checks_out: '' });
     const rec = Object.assign({}, prev, patch, { updatedAt: now });
     /* В журнал — только настоящую смену: повтор того же состояния journal засоряет.
        Свой текст записи (задание, отчёт) отменяет автоматический: две строки об
@@ -302,9 +314,19 @@ window.Build = (function () {
     const add = files.filter(f => cur.target.indexOf(f) < 0);
     if (add.length) patch.target = cur.target.concat(add);
     if (r.checks) patch.checks = String(r.checks);
+    /* Результат прогона — отдельно от статуса: исполнитель волен сказать
+       «готово», но зелёными проверки от этого не станут. Пишем только когда о
+       нём сообщили, иначе молчание затирало бы прошлый честный прогон. */
+    if (r.checks_ok !== undefined) {
+      patch.checks_ok = r.checks_ok === true ? true : r.checks_ok === false ? false : null;
+      patch.checks_at = now;
+      patch.checks_out = String(r.checks_out === undefined ? '' : r.checks_out).slice(0, 2000);
+    }
     if (r.owner) patch.owner = String(r.owner);
     const who = String(r.owner || cur.owner || '').trim();
-    const what = String(r.note || '').trim() || 'отчёт: ' + label(patch.status || cur.status);
+    const verdict = patch.checks_ok === true ? ' · проверки зелёные'
+                  : patch.checks_ok === false ? ' · ПРОВЕРКИ КРАСНЫЕ' : '';
+    const what = (String(r.note || '').trim() || 'отчёт: ' + label(patch.status || cur.status)) + verdict;
     const old = patch.status && patch.status !== 'todo' && r.spec_rev && String(r.spec_rev) !== stampOf(nodeId).spec_rev;
     /* Про чужую редакцию говорим В ЖУРНАЛЕ: баннер дрейфа умеет отличать правку
        блока от правки входа, а «строили по другому заданию» — третья причина,

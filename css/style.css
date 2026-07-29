@@ -321,9 +321,19 @@ button,input,select,textarea{font:inherit;color:inherit}
 .edge{fill:none;stroke-width:2;opacity:.85;pointer-events:none;stroke-linecap:round}
 .edge.data{stroke-dasharray:2 6;opacity:.75}
 .edge.back{stroke-dasharray:9 6;opacity:.9}
+/* Аварийный маршрут: короткий штрих — читается как «это не основной поток»,
+   но плотнее, чем пунктир данных, чтобы их не путать. */
+.edge.err{stroke-dasharray:6 4;opacity:.95}
 .edge.sel{stroke-width:3.5;opacity:1;filter:drop-shadow(0 0 6px currentColor)}
 .edge.ghost{stroke:#f5a524;stroke-dasharray:6 5;opacity:.9}
 .edge.ghost.data{stroke:#2dd4bf}
+/* Контур единицы развёртывания — граница, за которую сбой не выходит.
+   Штрих, а не сплошная: это область, а не связь. */
+.unit-box rect{fill:rgba(56,189,248,.045);stroke:rgba(56,189,248,.38);stroke-width:1.5;stroke-dasharray:10 6}
+.unit-box text{
+  fill:#38bdf8;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  opacity:.75;paint-order:stroke;stroke:#0b0e14;stroke-width:3px;
+}
 .edge-hit{fill:none;stroke:transparent;stroke-width:18;pointer-events:stroke;cursor:pointer}
 .edge-arrow{opacity:.9}
 
@@ -390,6 +400,12 @@ button,input,select,textarea{font:inherit;color:inherit}
   background:#0c1017;border:2px solid var(--c);transition:.12s ease;
 }
 .port.data i{border-radius:2px;border-color:#2dd4bf;transform:rotate(45deg)}
+/* Порт ошибки — красный, независимо от цвета блока: аварийный выход должен
+   отличаться от обычного «дальше» ещё до того, как к нему подвели провод. */
+.port[data-port="err"] i{border-color:#f87171;background:#1a0f12}
+.port[data-port="err"]:hover i,.port[data-port="err"].hot i{
+  background:#f87171;box-shadow:0 0 0 4px rgba(248,113,113,.25);
+}
 .port:hover i,.port.hot i{background:var(--c);box-shadow:0 0 0 4px color-mix(in oklab,var(--c) 25%,transparent);transform:scale(1.15)}
 .port.data:hover i,.port.data.hot i{background:#2dd4bf;box-shadow:0 0 0 4px rgba(45,212,191,.25);transform:rotate(45deg) scale(1.15)}
 .port-label{
@@ -580,6 +596,29 @@ textarea.code.bad{border-color:var(--err);box-shadow:0 0 0 3px rgba(248,113,113,
 .plan-orphans{margin-top:10px;padding-top:9px;border-top:1px solid var(--line-soft);letter-spacing:.04em;text-transform:none}
 
 /* проверка */
+/* Сводка по структуре — полоса чисел над списком находок. Не таблица и не
+   график: строка, которую видно боковым зрением, пока рисуешь схему. */
+.qbar{
+  display:flex;flex-wrap:wrap;gap:6px;align-items:center;
+  padding:2px 0 9px;margin-bottom:8px;border-bottom:1px solid var(--line);
+}
+.qc{
+  display:inline-flex;align-items:baseline;gap:5px;padding:3px 9px;border-radius:999px;
+  background:var(--panel-2);border:1px solid var(--line);
+  font-size:11px;letter-spacing:.02em;color:var(--mute);cursor:help;white-space:nowrap;
+}
+.qc b{font-size:13px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+.qc.bad{border-color:rgba(245,165,36,.45);background:rgba(245,165,36,.08);color:#f5a524}
+.qc.bad b{color:#f5a524}
+/* Результат прогона проверок готовности: зелёные — спокойно, красные — видно
+   сразу, вместе с хвостом вывода, чтобы не гонять их заново ради причины. */
+.hint.ok{color:#4ade80}
+.hint.bad{color:#f87171;font-weight:600}
+.checks-out{
+  margin:6px 0 0;padding:7px 9px;max-height:150px;overflow:auto;
+  background:#140e10;border:1px solid rgba(248,113,113,.3);border-radius:7px;
+  font:11px/1.45 ui-monospace,Consolas,monospace;color:#fca5a5;white-space:pre-wrap;
+}
 .checks{list-style:none;margin:0;padding:0}
 .check{display:flex;align-items:flex-start;gap:9px;padding:6px 9px;border-radius:7px;font-size:12.5px;color:var(--dim);cursor:pointer}
 .check:hover{background:var(--panel-2);color:var(--text)}
@@ -639,6 +678,7 @@ textarea.code.bad{border-color:var(--err);box-shadow:0 0 0 3px rgba(248,113,113,
 .hwire{fill:none;stroke-width:2;opacity:.9;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
 .hwire.data{stroke-dasharray:2 6;opacity:.7;stroke-width:1.6}
 .hwire.back{opacity:.55;stroke-dasharray:9 6}
+.hwire.err{stroke-dasharray:6 4;opacity:1}   /* аварийный маршрут — как на холсте */
 .hwire.sel{stroke-width:3.6;opacity:1;filter:drop-shadow(0 0 7px currentColor)}
 .hwire-hit{fill:none;stroke:transparent;stroke-width:14;pointer-events:stroke;cursor:pointer}
 .hwire-cap{opacity:.9;pointer-events:none}

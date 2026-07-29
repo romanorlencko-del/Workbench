@@ -1,0 +1,1006 @@
+{
+  "version": 1,
+  "name": "Заказы и платежи — проверка новых полей",
+  "meta": {
+    "description": "Тестовая схема под словарь данных, окружения, узор, решения и ответственность. Должна проходить собственную проверку без замечаний.",
+    "workdir": "",
+    "max_parallel": 4,
+    "log_level": "info",
+    "stage": "wiring",
+    "input_reserve_tokens": 8000,
+    "models": {
+      "primary": {
+        "label": "Основная",
+        "provider": "openai-compatible",
+        "base_url": "https://api.gonka24.com/v1",
+        "model": "qwen3-235b",
+        "api_key_env": "GONKA_API_KEY",
+        "context_tokens": 160000,
+        "max_output_tokens": 16384
+      },
+      "heavy": {
+        "label": "Тяжёлая",
+        "provider": "openai-compatible",
+        "base_url": "",
+        "model": "glm-5.2",
+        "api_key_env": "GLM_API_KEY",
+        "context_tokens": 1000000,
+        "max_output_tokens": 32768
+      }
+    },
+    "rev": 1
+  },
+  "nodes": [
+    {
+      "id": "env_prod",
+      "type": "env",
+      "name": "Боевое",
+      "x": 40,
+      "y": 40,
+      "enabled": true,
+      "notes": "",
+      "params": {
+        "name": "prod",
+        "base": true,
+        "purpose": "боевой контур, живые деньги",
+        "config_source": "values_yaml",
+        "data": "real"
+      }
+    },
+    {
+      "id": "env_dev",
+      "type": "env",
+      "name": "Разработка",
+      "x": 240,
+      "y": 40,
+      "enabled": true,
+      "notes": "",
+      "params": {
+        "name": "dev",
+        "base": false,
+        "purpose": "ноутбук разработчика",
+        "config_source": "env_file",
+        "data": "synthetic"
+      }
+    },
+    {
+      "id": "pattern_intake",
+      "type": "pattern",
+      "name": "Узор приёма",
+      "x": 460,
+      "y": 40,
+      "enabled": true,
+      "notes": "",
+      "params": {
+        "name": "приём-и-проверка",
+        "purpose": "принять пачку из чужого API, проверить по схеме, положить в шину",
+        "varies": [
+          "source",
+          "output_var",
+          "unit",
+          "input_var",
+          "idem_key",
+          "outbox_table"
+        ],
+        "env_over": [
+          {
+            "env": "dev",
+            "role": "вход",
+            "key": "interval_s",
+            "value": "600.000",
+            "why": "не долбить мок каждую минуту"
+          }
+        ]
+      }
+    },
+    {
+      "id": "entity_order",
+      "type": "entity",
+      "name": "Заказ",
+      "x": 40,
+      "y": 200,
+      "enabled": true,
+      "notes": "",
+      "params": {
+        "key": "order",
+        "vars": [
+          "ctx.order",
+          "ctx.order_checked"
+        ],
+        "id_field": "id",
+        "owner": "intake",
+        "fields": [
+          {
+            "name": "id",
+            "kind": "string",
+            "required": true,
+            "note": "uuid, приходит от источника"
+          },
+          {
+            "name": "total",
+            "kind": "money",
+            "required": true,
+            "note": "в копейках, без НДС"
+          },
+          {
+            "name": "status",
+            "kind": "enum",
+            "values": [
+              "new",
+              "checked",
+              "paid"
+            ],
+            "required": true
+          },
+          {
+            "name": "created_at",
+            "kind": "ts",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "entity_payment",
+      "type": "entity",
+      "name": "Платёж",
+      "x": 240,
+      "y": 200,
+      "enabled": true,
+      "notes": "",
+      "params": {
+        "key": "payment",
+        "vars": [
+          "ctx.payment",
+          "ctx.payment_checked",
+          "ctx.payment_charged"
+        ],
+        "id_field": "id",
+        "owner": "billing",
+        "fields": [
+          {
+            "name": "id",
+            "kind": "string",
+            "required": true
+          },
+          {
+            "name": "order",
+            "kind": "ref",
+            "ref": "order",
+            "required": true,
+            "note": "какой заказ оплачивают"
+          },
+          {
+            "name": "amount",
+            "kind": "money",
+            "required": true,
+            "note": "в копейках"
+          },
+          {
+            "name": "status",
+            "kind": "enum",
+            "values": [
+              "new",
+              "held",
+              "charged",
+              "failed"
+            ],
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "dec_bus",
+      "type": "decision",
+      "name": "Шина",
+      "x": 460,
+      "y": 200,
+      "enabled": true,
+      "notes": "",
+      "params": {
+        "title": "шина вместо прямого вызова",
+        "status": "accepted",
+        "date": "2026-07-29",
+        "affects": [
+          "intake",
+          "billing"
+        ],
+        "context": "пик заказов валил биллинг, и вместе с ним останавливался приём",
+        "rejected": "прямой вызов с повторами — падение биллинга всё равно останавливает приём;\nобщая база на два контура — снимает изоляцию, ради которой их и разделили",
+        "costs": "согласованность стала отложенной; появился изолятор, за которым надо следить",
+        "revisit": "если поток упадёт ниже 5/с — шина станет дороже пользы"
+      }
+    },
+    {
+      "id": "dec_kopeck",
+      "type": "decision",
+      "name": "Копейки",
+      "x": 660,
+      "y": 200,
+      "enabled": true,
+      "notes": "",
+      "params": {
+        "title": "суммы целыми копейками",
+        "status": "accepted",
+        "date": "2026-07-29",
+        "affects": [
+          "order",
+          "payment"
+        ],
+        "context": "на сверке расходились итоги: дробные рубли округлялись по-разному в двух местах",
+        "rejected": "дробные рубли — округления расходятся;\ndecimal-строки — каждый парсит по-своему",
+        "costs": "везде делить на 100 при показе человеку",
+        "revisit": "если появятся валюты без сотых долей"
+      }
+    },
+    {
+      "id": "mon",
+      "type": "monitor",
+      "name": "Логи и тревоги",
+      "x": 860,
+      "y": 40,
+      "enabled": true,
+      "notes": "",
+      "params": {
+        "name": "central-logs",
+        "sink": "loki",
+        "endpoint": "http://loki:3100",
+        "format": "json",
+        "correlation_key": "trace_id",
+        "fields": [
+          "ts",
+          "level",
+          "service",
+          "trace_id",
+          "message_id",
+          "attempt",
+          "error"
+        ],
+        "retention_days": 30,
+        "sampling_pct": 100,
+        "alerts": [
+          {
+            "name": "изолятор растёт",
+            "on": "dlq_growth",
+            "threshold": "100 записей",
+            "window_m": 5,
+            "channel": "telegram: #ops"
+          },
+          {
+            "name": "приём встал",
+            "on": "no_traffic",
+            "threshold": "0 сообщений",
+            "window_m": 10,
+            "channel": "telegram: #ops"
+          }
+        ],
+        "env_over": [
+          {
+            "env": "dev",
+            "key": "sink",
+            "value": "stdout_collector",
+            "why": "на ноутбуке Loki не поднимаем"
+          }
+        ]
+      }
+    },
+    {
+      "id": "u_intake",
+      "type": "unit",
+      "name": "intake",
+      "x": 40,
+      "y": 380,
+      "enabled": true,
+      "notes": "",
+      "params": {
+        "name": "intake",
+        "owner": "команда приёма",
+        "image": "registry.example.com/intake:1.4.0",
+        "replicas": 2,
+        "restart": "on-failure",
+        "health": "http",
+        "health_path": "/healthz",
+        "health_port": 8080,
+        "logs_to": "central-logs",
+        "log_level": "info",
+        "metrics": [
+          "обработано/с",
+          "время шага",
+          "доля ошибок"
+        ],
+        "network": "deny_by_default",
+        "ports": [
+          {
+            "port": 8080,
+            "protocol": "http",
+            "name": "метрики и живость",
+            "expose": "cluster"
+          }
+        ],
+        "env_over": [
+          {
+            "env": "dev",
+            "key": "replicas",
+            "value": "1",
+            "why": "один процесс на ноутбуке"
+          },
+          {
+            "env": "dev",
+            "key": "image",
+            "value": "intake:local",
+            "why": "собирается локально"
+          },
+          {
+            "env": "dev",
+            "key": "log_level",
+            "value": "debug",
+            "why": "видеть каждый шаг"
+          }
+        ],
+        "egress_external": [
+          "api.example.com:443"
+        ]
+      }
+    },
+    {
+      "id": "u_billing",
+      "type": "unit",
+      "name": "billing",
+      "x": 300,
+      "y": 380,
+      "enabled": true,
+      "notes": "",
+      "params": {
+        "name": "billing",
+        "owner": "команда платежей",
+        "image": "registry.example.com/billing:1.4.0",
+        "replicas": 2,
+        "restart": "on-failure",
+        "health": "http",
+        "health_path": "/healthz",
+        "health_port": 8080,
+        "logs_to": "central-logs",
+        "log_level": "info",
+        "metrics": [
+          "обработано/с",
+          "время шага",
+          "доля ошибок"
+        ],
+        "network": "deny_by_default",
+        "ports": [
+          {
+            "port": 8080,
+            "protocol": "http",
+            "name": "метрики и живость",
+            "expose": "cluster"
+          }
+        ],
+        "env_over": [
+          {
+            "env": "dev",
+            "key": "replicas",
+            "value": "1",
+            "why": "один процесс на ноутбуке"
+          },
+          {
+            "env": "dev",
+            "key": "image",
+            "value": "billing:local",
+            "why": "собирается локально"
+          },
+          {
+            "env": "dev",
+            "key": "log_level",
+            "value": "debug",
+            "why": "видеть каждый шаг"
+          }
+        ],
+        "egress_external": [
+          "api.example.com:443",
+          "api.stripe.com:443"
+        ]
+      }
+    },
+    {
+      "id": "u_bus",
+      "type": "unit",
+      "name": "bus",
+      "x": 560,
+      "y": 380,
+      "enabled": true,
+      "notes": "",
+      "params": {
+        "name": "bus",
+        "owner": "платформа",
+        "image": "registry.example.com/bus:1.4.0",
+        "replicas": 2,
+        "restart": "on-failure",
+        "health": "tcp",
+        "health_path": "/healthz",
+        "health_port": 5672,
+        "logs_to": "central-logs",
+        "log_level": "info",
+        "metrics": [
+          "обработано/с",
+          "время шага",
+          "доля ошибок"
+        ],
+        "network": "deny_by_default",
+        "ports": [
+          {
+            "port": 5672,
+            "protocol": "tcp",
+            "name": "AMQP",
+            "expose": "cluster"
+          }
+        ],
+        "env_over": [
+          {
+            "env": "dev",
+            "key": "replicas",
+            "value": "1",
+            "why": "один процесс на ноутбуке"
+          },
+          {
+            "env": "dev",
+            "key": "image",
+            "value": "bus:local",
+            "why": "собирается локально"
+          },
+          {
+            "env": "dev",
+            "key": "log_level",
+            "value": "debug",
+            "why": "видеть каждый шаг"
+          }
+        ],
+        "depends_on": [],
+        "egress_external": []
+      }
+    },
+    {
+      "id": "ord_in",
+      "type": "input",
+      "name": "Приём: заказы",
+      "x": 40,
+      "y": 560,
+      "enabled": true,
+      "notes": "Точка входа повтора «заказы». Тянет пачку из чужого API своим темпом.",
+      "params": {
+        "kind": "api",
+        "source": "https://api.example.com/v1/orders",
+        "method": "GET",
+        "format": "json",
+        "query": "изменённые с последней метки",
+        "schedule": "interval",
+        "interval_s": 60,
+        "auth_env": "PARTNER_API_KEY",
+        "limit": 500,
+        "output_var": "ctx.order",
+        "on_error": "route",
+        "retry": 3,
+        "backoff": "exponential",
+        "backoff_s": 1,
+        "backoff_max_s": 30,
+        "jitter": true,
+        "breaker": "on",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "queue",
+        "unit": "intake",
+        "pattern": "приём-и-проверка",
+        "pattern_role": "вход",
+        "pattern_case": "заказы",
+        "rps": 20,
+        "peak_factor": 2,
+        "rps_one": 20,
+        "latency_ms": 200,
+        "payload_kb": 4,
+        "env_over": [
+          {
+            "env": "dev",
+            "key": "source",
+            "value": "http://localhost:8080/mock/заказы",
+            "why": "к боевому API партнёра с ноутбука доступа нет"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ord_chk",
+      "type": "process",
+      "name": "Проверка: заказы",
+      "x": 40,
+      "y": 700,
+      "enabled": true,
+      "notes": "Проверка повтора «заказы»: форма — сущность «Заказ»",
+      "params": {
+        "op": "filter",
+        "rule": "отбросить записи без обязательных полей сущности и с чужой валютой",
+        "input_var": "ctx.order",
+        "output_var": "ctx.order_checked",
+        "on_error": "route",
+        "idem_key": "ctx.order.id",
+        "idem_store": "redis",
+        "idem_window_h": 24,
+        "unit": "intake",
+        "pattern": "приём-и-проверка",
+        "pattern_role": "проверка",
+        "pattern_case": "заказы",
+        "publish_mode": "outbox",
+        "outbox_table": "outbox_заказы",
+        "relay": "worker",
+        "relay_interval_s": 1,
+        "outbox_keep_h": 72,
+        "rps": 20,
+        "peak_factor": 2,
+        "rps_one": 40,
+        "latency_ms": 80,
+        "payload_kb": 4
+      }
+    },
+    {
+      "id": "pay_in",
+      "type": "input",
+      "name": "Приём: платежи",
+      "x": 300,
+      "y": 560,
+      "enabled": true,
+      "notes": "Точка входа повтора «платежи». Тянет пачку из чужого API своим темпом.",
+      "params": {
+        "kind": "api",
+        "source": "https://api.example.com/v1/payments",
+        "method": "GET",
+        "format": "json",
+        "query": "изменённые с последней метки",
+        "schedule": "interval",
+        "interval_s": 60,
+        "auth_env": "PARTNER_API_KEY",
+        "limit": 500,
+        "output_var": "ctx.payment",
+        "on_error": "route",
+        "retry": 3,
+        "backoff": "exponential",
+        "backoff_s": 1,
+        "backoff_max_s": 30,
+        "jitter": true,
+        "breaker": "on",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "queue",
+        "unit": "billing",
+        "pattern": "приём-и-проверка",
+        "pattern_role": "вход",
+        "pattern_case": "платежи",
+        "rps": 20,
+        "peak_factor": 2,
+        "rps_one": 20,
+        "latency_ms": 200,
+        "payload_kb": 4,
+        "env_over": [
+          {
+            "env": "dev",
+            "key": "source",
+            "value": "http://localhost:8080/mock/платежи",
+            "why": "к боевому API партнёра с ноутбука доступа нет"
+          }
+        ]
+      }
+    },
+    {
+      "id": "pay_chk",
+      "type": "process",
+      "name": "Проверка: платежи",
+      "x": 300,
+      "y": 700,
+      "enabled": true,
+      "notes": "Проверка повтора «платежи»: форма — сущность «Платёж»",
+      "params": {
+        "op": "filter",
+        "rule": "отбросить записи без обязательных полей сущности и с чужой валютой",
+        "input_var": "ctx.payment",
+        "output_var": "ctx.payment_checked",
+        "on_error": "route",
+        "idem_key": "ctx.payment.id",
+        "idem_store": "redis",
+        "idem_window_h": 24,
+        "unit": "billing",
+        "pattern": "приём-и-проверка",
+        "pattern_role": "проверка",
+        "pattern_case": "платежи",
+        "publish_mode": "outbox",
+        "outbox_table": "outbox_платежи",
+        "relay": "worker",
+        "relay_interval_s": 1,
+        "outbox_keep_h": 72,
+        "rps": 20,
+        "peak_factor": 2,
+        "rps_one": 40,
+        "latency_ms": 80,
+        "payload_kb": 4
+      }
+    },
+    {
+      "id": "bus",
+      "type": "broker",
+      "name": "Шина проверенного",
+      "x": 560,
+      "y": 700,
+      "enabled": true,
+      "notes": "Развязка приёма и списания: решение «шина вместо прямого вызова».",
+      "params": {
+        "topic": "intake.checked",
+        "transport": "rabbitmq",
+        "schema": "{ trace_id, kind: order|payment, id, payload }",
+        "schema_version": "1.2.0",
+        "compat": "backward",
+        "versions_live": 2,
+        "on_unknown": "ignore_unknown",
+        "group": "charger",
+        "ack": "manual",
+        "visibility_s": 60,
+        "prefetch": 16,
+        "max_attempts": 5,
+        "ordering": "by_key",
+        "partition_key": "id",
+        "retention_h": 168,
+        "unit": "bus"
+      }
+    },
+    {
+      "id": "dlq",
+      "type": "dlq",
+      "name": "Изолятор приёма",
+      "x": 800,
+      "y": 700,
+      "enabled": true,
+      "notes": "Сюда уходит то, что не прошло пять попыток. Без него отказ одного элемента останавливал бы поток.",
+      "params": {
+        "name": "intake-dlq",
+        "store": "postgres",
+        "keep": [
+          "тело",
+          "причина",
+          "стек",
+          "номер попытки",
+          "время",
+          "trace_id"
+        ],
+        "retention_days": 14,
+        "alert_after": 100,
+        "unit": "bus",
+        "env_over": [
+          {
+            "env": "dev",
+            "key": "retention_days",
+            "value": "2",
+            "why": "ноутбуку хватит двух дней"
+          }
+        ]
+      }
+    },
+    {
+      "id": "rep",
+      "type": "repair",
+      "name": "Разбор изолятора",
+      "x": 800,
+      "y": 560,
+      "enabled": true,
+      "notes": "Бесшовное лечение: работает своим темпом и не требует остановки потока.",
+      "params": {
+        "source": "intake-dlq",
+        "trigger": "cron",
+        "cron": "0 * * * *",
+        "batch": 50,
+        "rate_per_min": 120,
+        "action": "republish",
+        "target_topic": "intake.checked",
+        "fix": "починить кодировку и недостающие необязательные поля; остальное оставить в изоляторе",
+        "on_error": "fail",
+        "unit": "bus"
+      }
+    },
+    {
+      "id": "charge",
+      "type": "process",
+      "name": "Списание",
+      "x": 560,
+      "y": 860,
+      "enabled": true,
+      "notes": "Держатель денег: берёт сумму платежа и статус заказа, ходит во внешний шлюз.",
+      "params": {
+        "op": "enrich",
+        "rule": "провести списание через шлюз и записать результат в статус платежа",
+        "input_var": "ctx.payment_checked.amount ctx.payment_checked.order",
+        "output_var": "ctx.payment_charged",
+        "on_error": "route",
+        "idem_key": "ctx.payment_checked.id",
+        "idem_store": "db_unique",
+        "idem_window_h": 72,
+        "breaker": "on",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "queue",
+        "unit": "billing",
+        "publish_mode": "none",
+        "rps": 20,
+        "peak_factor": 2,
+        "rps_one": 25,
+        "latency_ms": 400,
+        "payload_kb": 2
+      }
+    },
+    {
+      "id": "save",
+      "type": "store",
+      "name": "Журнал операций",
+      "x": 560,
+      "y": 1000,
+      "enabled": true,
+      "notes": "Что именно списали и по какому заказу — чтобы сверка сходилась без обращения к шлюзу.",
+      "params": {
+        "writes": [
+          "ctx.payment_charged"
+        ],
+        "dataset": "payments",
+        "target": "postgres",
+        "uri": "postgres://billing-db/payments",
+        "keep": "forever",
+        "dedupe_key": "ctx.payment_charged.id",
+        "idem_store": "db_unique",
+        "idem_window_h": 72,
+        "versioning": false,
+        "redact_secrets": true,
+        "output_var": "ctx.run_id",
+        "unit": "billing",
+        "publish_mode": "none",
+        "rps": 20,
+        "peak_factor": 2,
+        "rps_one": 60,
+        "latency_ms": 30,
+        "payload_kb": 2
+      }
+    },
+    {
+      "id": "out",
+      "type": "sink",
+      "name": "Ответ партнёру",
+      "x": 800,
+      "y": 1000,
+      "enabled": true,
+      "notes": "Подтверждение во внешний API партнёра: за периметр, поэтому адрес объявлен в контуре.",
+      "params": {
+        "channel": "api",
+        "target": "https://api.stripe.com/v1/confirmations",
+        "method": "POST",
+        "payload": "ctx.payment_charged",
+        "format": "json",
+        "auth_env": "STRIPE_API_KEY",
+        "retry": 3,
+        "backoff": "exponential",
+        "backoff_s": 1,
+        "backoff_max_s": 30,
+        "jitter": true,
+        "on_error": "route",
+        "idem_key": "ctx.payment_charged.id",
+        "idem_store": "redis",
+        "idem_window_h": 24,
+        "breaker": "on",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "queue",
+        "unit": "billing",
+        "publish_mode": "none",
+        "rps": 20,
+        "peak_factor": 2,
+        "rps_one": 25,
+        "latency_ms": 300,
+        "payload_kb": 2
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "kind": "flow",
+      "from": {
+        "node": "ord_in",
+        "port": "out"
+      },
+      "to": {
+        "node": "ord_chk",
+        "port": "in"
+      }
+    },
+    {
+      "id": "e2",
+      "kind": "flow",
+      "from": {
+        "node": "pay_in",
+        "port": "out"
+      },
+      "to": {
+        "node": "pay_chk",
+        "port": "in"
+      }
+    },
+    {
+      "id": "e3",
+      "kind": "flow",
+      "from": {
+        "node": "ord_chk",
+        "port": "out"
+      },
+      "to": {
+        "node": "bus",
+        "port": "in"
+      }
+    },
+    {
+      "id": "e4",
+      "kind": "flow",
+      "from": {
+        "node": "pay_chk",
+        "port": "out"
+      },
+      "to": {
+        "node": "bus",
+        "port": "in"
+      }
+    },
+    {
+      "id": "e5",
+      "kind": "flow",
+      "from": {
+        "node": "bus",
+        "port": "dlq"
+      },
+      "to": {
+        "node": "dlq",
+        "port": "in"
+      }
+    },
+    {
+      "id": "e6",
+      "kind": "flow",
+      "from": {
+        "node": "dlq",
+        "port": "out"
+      },
+      "to": {
+        "node": "rep",
+        "port": "in"
+      }
+    },
+    {
+      "id": "e7",
+      "kind": "flow",
+      "from": {
+        "node": "rep",
+        "port": "out"
+      },
+      "to": {
+        "node": "bus",
+        "port": "in"
+      }
+    },
+    {
+      "id": "e8",
+      "kind": "flow",
+      "from": {
+        "node": "bus",
+        "port": "out"
+      },
+      "to": {
+        "node": "charge",
+        "port": "in"
+      }
+    },
+    {
+      "id": "e9",
+      "kind": "flow",
+      "from": {
+        "node": "charge",
+        "port": "out"
+      },
+      "to": {
+        "node": "save",
+        "port": "in"
+      }
+    },
+    {
+      "id": "e10",
+      "kind": "flow",
+      "from": {
+        "node": "save",
+        "port": "out"
+      },
+      "to": {
+        "node": "out",
+        "port": "in"
+      }
+    },
+    {
+      "id": "e11",
+      "kind": "flow",
+      "from": {
+        "node": "ord_in",
+        "port": "err"
+      },
+      "to": {
+        "node": "dlq",
+        "port": "in"
+      }
+    },
+    {
+      "id": "e12",
+      "kind": "flow",
+      "from": {
+        "node": "ord_chk",
+        "port": "err"
+      },
+      "to": {
+        "node": "dlq",
+        "port": "in"
+      }
+    },
+    {
+      "id": "e13",
+      "kind": "flow",
+      "from": {
+        "node": "pay_in",
+        "port": "err"
+      },
+      "to": {
+        "node": "dlq",
+        "port": "in"
+      }
+    },
+    {
+      "id": "e14",
+      "kind": "flow",
+      "from": {
+        "node": "pay_chk",
+        "port": "err"
+      },
+      "to": {
+        "node": "dlq",
+        "port": "in"
+      }
+    },
+    {
+      "id": "e15",
+      "kind": "flow",
+      "from": {
+        "node": "charge",
+        "port": "err"
+      },
+      "to": {
+        "node": "dlq",
+        "port": "in"
+      }
+    },
+    {
+      "id": "e16",
+      "kind": "flow",
+      "from": {
+        "node": "out",
+        "port": "err"
+      },
+      "to": {
+        "node": "dlq",
+        "port": "in"
+      }
+    }
+  ],
+  "seq": 38
+}

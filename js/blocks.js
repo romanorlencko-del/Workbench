@@ -18,6 +18,158 @@ window.BLOCKS = (function () {
   const IN  = (id, label, kind, multi) => ({ id, label, kind: kind || 'flow', multi: !!multi });
   const OUT = IN;
 
+  /* Провод ошибки. Растёт из выбора «При ошибке → увести по проводу»: сбойный
+     элемент уходит ОТДЕЛЬНЫМ маршрутом (в изолятор, на ремонт, в лог), а не
+     гасит всю ветку. Порт появляется только по осознанному выбору — иначе
+     схема заросла бы вторым выходом у каждого блока.
+     kind:'flow' намеренно: это настоящая ветка выполнения, как «да/нет»
+     у «Условия», и очередь обязана её видеть. */
+  const withErr = (outs, p) => (p && p.on_error === 'route') ? outs.concat(OUT('err', 'ошибка')) : outs;
+
+  /* Повторы. «Растущая пауза» — это стратегия, а не число: смежной системе
+     нужно время подняться, а одинаковые паузы её только добивают. Разброс
+     обязателен, иначе все повторы придут одной волной и устроят второй удар. */
+  const RETRY = (n0) => [
+    { key: 'retry', label: 'Повторов при сбое', type: 'number', default: n0, min: 0, step: 1 },
+    { key: 'backoff', label: 'Пауза между повторами', type: 'select', default: 'exponential',
+      options: [['fixed','одинаковая'],['exponential','растущая вдвое'],['list','явный список']],
+      when: n => (n.retry | 0) > 0 },
+    { key: 'backoff_s', label: 'Пауза, с', type: 'number', default: 1.000, min: 0, step: 0.001,
+      when: n => (n.retry | 0) > 0 && n.backoff !== 'list' },
+    { key: 'backoff_max_s', label: 'Но не дольше, с', type: 'number', default: 30.000, min: 0, step: 0.001,
+      when: n => (n.retry | 0) > 0 && n.backoff === 'exponential' },
+    { key: 'backoff_list', label: 'Паузы по шагам, с', type: 'text', placeholder: '1.000, 5.000, 30.000',
+      when: n => (n.retry | 0) > 0 && n.backoff === 'list' },
+    { key: 'jitter', label: 'Разброс пауз ±20%', type: 'bool', default: true,
+      when: n => (n.retry | 0) > 0 },
+  ];
+
+  /* Идемпотентность. Ключ отвечает на «что считать тем же самым элементом»,
+     хранилище — на «чем гарантируем». Уникальный индекс в БД надёжнее памяти:
+     он держит гарантию даже когда сервис перезапустили и отпечатки потеряны. */
+  const IDEM_ON = (keyField) => [
+    { key: 'idem_store', label: 'Чем гарантируем неповторность', type: 'select', default: 'db_unique',
+      options: [['db_unique','уникальный индекс в БД — вставка-или-ничего'],
+                ['redis','Redis с временем жизни'],
+                ['table','отдельная таблица отпечатков']],
+      when: n => String(n[keyField] || '').trim() !== '' },
+    { key: 'idem_window_h', label: 'Помним отпечатки, ч', type: 'number', default: 24, min: 1, step: 1,
+      when: n => String(n[keyField] || '').trim() !== '' && n.idem_store !== 'db_unique' },
+  ];
+  const IDEM = [
+    { key: 'idem_key', label: 'Ключ идемпотентности', type: 'text', placeholder: 'order_id + event_type',
+      hint: 'По каким полям считаем элемент тем же самым. Пусто — защиты нет' },
+  ].concat(IDEM_ON('idem_key'));
+
+  /* Предохранитель. Свойство ВЫЗЫВАЮЩЕГО: это он перестаёт стучаться в чужой
+     сервис, который сыплет ошибками, и тем даёт ему встать. Полуоткрытое
+     состояние обязательно — иначе разморозка сама себе устроит новый обвал. */
+/* Принадлежность к контуру развёртывания. Ссылка ПО ИМЕНИ, как «Ремонт» на
+     изолятор: перетаскивание блока по холсту не должно менять состав контура,
+     а состав — не должен зависеть от того, где блок нарисован. */
+  /* Транзакционная публикация. Классическая дыра: блок пишет в базу и потом
+     публикует событие в шину. Упал между — либо запись без события, либо
+     событие без записи, и никакая идемпотентность потребителя это не лечит,
+     потому что лечить нечего: события просто нет. Outbox закрывает окно —
+     событие пишется В ТУ ЖЕ транзакцию, а публикует его отдельный релей. */
+  /* Нефункциональные требования. Без них все числа схемы — реплики, prefetch,
+     лимиты памяти — держатся на честном слове: обосновать их нечем и проверить
+     после постройки нечем. Дефолтов тут нет намеренно: выдуманная нагрузка
+     хуже отсутствующей, потому что выглядит как замеренная. */
+  const LOAD = [
+    { key: 'rps', label: 'Должен держать, шт/с', type: 'number', min: 0, step: 0.001,
+      placeholder: '100.000',
+      hint: 'Требование ко всему блоку, со всеми репликами. Пусто — нагрузка не задана' },
+    { key: 'peak_factor', label: 'Пик выше среднего, во сколько раз', type: 'number', default: 1.000, min: 1, step: 0.001,
+      when: n => Number(n.rps) > 0,
+      hint: 'Считать надо по пику, а не по среднему: система падает именно на нём' },
+    { key: 'rps_one', label: 'Одна реплика тянет, шт/с', type: 'number', min: 0, step: 0.001,
+      placeholder: '30.000',
+      when: n => Number(n.rps) > 0,
+      hint: 'Замер или обоснованная оценка. По нему конструктор посчитает, сколько нужно реплик' },
+    { key: 'latency_ms', label: 'Время шага, мс', type: 'number', min: 0, step: 1,
+      placeholder: '250',
+      hint: 'Сколько занимает обработка одного элемента. Сверяется с временем невидимости у брокера' },
+    { key: 'payload_kb', label: 'Типичный элемент, КБ', type: 'number', min: 0, step: 1, placeholder: '4' },
+  ];
+
+  const OUTBOX = [
+    { key: 'publish_mode', label: 'Публикация события', type: 'select', default: 'none',
+      options: [['none','ничего не публикует'],
+                ['direct','сразу после записи — есть окно потери между записью и публикацией'],
+                ['outbox','через outbox — событие в ту же транзакцию, публикует релей']] },
+    { key: 'outbox_table', label: 'Таблица outbox', type: 'text', default: 'outbox',
+      when: n => n.publish_mode === 'outbox' },
+    { key: 'relay', label: 'Кто публикует из outbox', type: 'select', default: 'worker',
+      options: [['worker','фоновой поток этого же сервиса'],['process','отдельный процесс'],
+                ['cdc','чтение журнала БД (CDC)']],
+      when: n => n.publish_mode === 'outbox' },
+    { key: 'relay_interval_s', label: 'Релей опрашивает каждые, с', type: 'number', default: 1.000, min: 0, step: 0.001,
+      when: n => n.publish_mode === 'outbox' && n.relay !== 'cdc' },
+    { key: 'outbox_keep_h', label: 'Держать опубликованные, ч', type: 'number', default: 24, min: 1, step: 1,
+      when: n => n.publish_mode === 'outbox',
+      hint: 'Нужны, чтобы разобрать двойную публикацию после сбоя релея' },
+  ];
+
+  /* Узор — повторяющийся кусок схемы. Пять одинаковых воркеров это не пять
+     задач, а одна, построенная пять раз; но пока схема не говорит, что они
+     одинаковы, исполнитель напишет пять реализаций, а правка дойдёт до одной.
+     Роль и повтор скрыты, пока узор не назван: подавляющее большинство блоков
+     ни в каком узоре не состоит, и три поля в каждой карточке были бы налогом
+     на всех ради немногих. */
+  const PATTERN = [
+    { key: 'pattern', label: 'Узор', type: 'text', placeholder: 'приём-и-проверка',
+      hint: 'Имя из блока «Узор». Одинаковые куски строятся ОДНИМ кодом, а не копией' },
+    { key: 'pattern_role', label: 'Роль в узоре', type: 'text', required: true, placeholder: 'приём',
+      when: n => !!String(n.pattern || '').trim(),
+      hint: 'Место блока внутри куска. У всех повторов роли одни и те же' },
+    { key: 'pattern_case', label: 'Какой это повтор', type: 'text', required: true, placeholder: 'заказы',
+      when: n => !!String(n.pattern || '').trim(),
+      hint: 'Чем занят именно этот экземпляр: заказы · платежи · отгрузки' },
+  ];
+
+  const DEPLOY = [
+    { key: 'unit', label: 'Единица развёртывания', type: 'text', placeholder: 'billing-worker',
+      hint: 'Имя из блока «Единица развёртывания». Один контур = один контейнер = граница, за которую сбой не выходит' },
+  ];
+
+  /* Отличия по окружениям. В полях блока стоят значения БАЗОВОГО окружения —
+     дублировать их для каждого прочего значило бы завести три копии плана,
+     которые разойдутся. Здесь только то, что ДЕЙСТВИТЕЛЬНО другое.
+     Ссылка на поле — по ключу параметра: конструктор сверит, что такой параметр
+     у типа есть и что значение годится (число там, где ждут число; один из
+     вариантов там, где выбор). Иначе это была бы записка на полях. */
+  const ENVOVER = [
+    { key: 'env_over', label: 'Отличия по окружениям', type: 'list', default: [],
+      itemLabel: it => `${it.env || '?'} · ${it.key || '?'}` +
+        (it.value === '' || it.value === undefined ? '' : ' = ' + it.value),
+      itemBadge: it => it.env || '',
+      item: [
+        { key: 'env', label: 'Окружение', type: 'text', required: true, placeholder: 'prod' },
+        { key: 'key', label: 'Какой параметр', type: 'text', required: true, placeholder: 'replicas' },
+        { key: 'value', label: 'Значение там', type: 'text', required: true, placeholder: '7' },
+        { key: 'why', label: 'Почему иначе', type: 'text', placeholder: 'боевая нагрузка · нет доступа наружу' },
+      ] },
+  ];
+
+  const BREAKER = [
+    { key: 'breaker', label: 'Предохранитель', type: 'select', default: 'off',
+      options: [['off','нет'],['on','замораживать вызовы при потоке ошибок']] },
+    { key: 'breaker_threshold', label: 'Порог: доля ошибок, %', type: 'number', default: 50, min: 1, max: 100, step: 1,
+      when: n => n.breaker === 'on' },
+    { key: 'breaker_window', label: 'На последних вызовах, шт', type: 'number', default: 20, min: 1, step: 1,
+      when: n => n.breaker === 'on' },
+    { key: 'breaker_open_s', label: 'Держать замороженным, с', type: 'number', default: 30.000, min: 0, step: 0.001,
+      when: n => n.breaker === 'on' },
+    { key: 'breaker_probe', label: 'Пробных вызовов при разморозке', type: 'number', default: 1, min: 1, step: 1,
+      when: n => n.breaker === 'on',
+      hint: 'Полуоткрытое состояние: пропускаем немного; прошли — открываем полностью, нет — снова замораживаем' },
+    { key: 'breaker_fallback', label: 'Пока заморожено', type: 'select', default: 'error',
+      options: [['error','сразу ошибка — уйдёт по маршруту ошибки'],['queue','копить в буфере'],
+                ['cached','отдавать последнее известное'],['skip','пропускать шаг']],
+      when: n => n.breaker === 'on' },
+  ];
+
   const TYPES = {
 
     /* ── ПОТОК ───────────────────────────────────────────── */
@@ -156,7 +308,7 @@ window.BLOCKS = (function () {
       label: 'Очередь', category: 'flow', color: '#a3e635', icon: '≡',
       desc: 'Правила выполнения ветвей ниже: порядок, параллельность, повторы.',
       inputs: [IN('in', 'вход', 'flow', true)],
-      outputs: [OUT('out', 'задачи')],
+      outputs: p => withErr([OUT('out', 'задачи')], p),
       params: [
         { key: 'mode', label: 'Режим', type: 'select', default: 'sequential',
           options: [['sequential','последовательно'],['parallel','параллельно']] },
@@ -164,14 +316,142 @@ window.BLOCKS = (function () {
         { key: 'order', label: 'Порядок выборки', type: 'select', default: 'fifo',
           options: [['fifo','FIFO'],['lifo','LIFO'],['priority','по приоритету']] },
         { key: 'priority', label: 'Приоритет', type: 'number', default: 0, step: 1 },
-        { key: 'retry', label: 'Повторы при ошибке', type: 'number', default: 1, min: 0, step: 1 },
-        { key: 'backoff_s', label: 'Backoff, с', type: 'number', default: 1.500, step: 0.001 },
+        ...RETRY(1),
         { key: 'rate_limit', label: 'Лимит, задач/мин', type: 'number', default: 0, min: 0, step: 1 },
-        { key: 'dedupe', label: 'Отбрасывать дубли', type: 'bool', default: false },
+        ...IDEM,
         { key: 'on_error', label: 'При ошибке', type: 'select', default: 'stop',
-          options: [['stop','остановить'],['skip','пропустить'],['requeue','вернуть в очередь']] },
+          options: [['stop','остановить'],['skip','пропустить'],['requeue','вернуть в очередь'],['route','увести по проводу']] },
+        ...DEPLOY,
+        ...PATTERN,
       ],
       summary: p => (p.mode === 'parallel' ? `параллельно ×${p.concurrency}` : 'последовательно') + ` · ${p.order}`,
+    },
+
+    /* Брокер — точка развязки. Издатель кладёт сообщение В ТЕМУ и не знает,
+       кто его прочитает; потребитель подписан на тему и не знает, кто положил.
+       Отсюда слабая связность: провод идёт через брокер, а не из сервиса
+       в сервис. Порт «в изолятор» структурный, а не по галочке: брокер без
+       DLQ — это и есть та самая цепная остановка, которой мы избегаем. */
+    broker: {
+      /* bounded — маршрут, замкнувшийся через брокер, НЕ бесконечный цикл:
+         счётчик попыток живёт в самом брокере и после max_attempts уводит
+         сообщение в изолятор. Требовать здесь блок «Цикл» с портом «виток»
+         неверно — это переотправка, а не итерация. */
+      label: 'Брокер', category: 'flow', color: '#818cf8', icon: '⇄', bounded: true, buffer: true,
+      desc: 'Промежуточный буфер между слоями: тема, подписка, подтверждение, потолок повторов и отвод в изолятор.',
+      inputs: [IN('in', 'публикация', 'flow', true)],
+      outputs: [OUT('out', 'доставка'), OUT('dlq', 'в изолятор')],
+      params: [
+        { key: 'topic', label: 'Тема / очередь', type: 'text', required: true, placeholder: 'orders.created' },
+        { key: 'transport', label: 'Чем реализуем', type: 'select', default: 'rabbitmq',
+          options: [['rabbitmq','RabbitMQ'],['kafka','Kafka'],['redis_streams','Redis Streams'],
+                    ['sqs','Amazon SQS'],['nats','NATS JetStream'],['postgres','таблица-очередь в PostgreSQL'],
+                    ['other','другое']] },
+        /* Контракт сообщения — то единственное, что связывает стороны. Без него
+           «слабая связность» вырождается в «никто ни о чём не договорился». */
+        { key: 'schema', label: 'Контракт сообщения', type: 'code', placeholder: '{ "id": "uuid", "type": "order.created", "payload": { … } }' },
+        /* Контракт без версии нельзя менять безопасно: потребители обновляются
+           не одновременно с издателем, и в шине какое-то время живут сообщения
+           обеих версий. Правило совместимости говорит исполнителю, что именно
+           запрещено менять, а не просто «будьте осторожны». */
+        { key: 'schema_version', label: 'Версия контракта', type: 'text', placeholder: '1.0.0',
+          when: n => String(n.schema || '').trim() !== '',
+          hint: 'Едет в самом сообщении — иначе потребитель не поймёт, что ему пришло' },
+        { key: 'compat', label: 'Правило совместимости', type: 'select', default: 'backward',
+          options: [['backward','новые потребители читают старые сообщения — поля только добавляются'],
+                    ['forward','старые потребители читают новые — поля только удаляются'],
+                    ['full','и то и другое — менять можно лишь необязательные поля'],
+                    ['none','ломать можно — все потребители обновляются разом']],
+          when: n => String(n.schema || '').trim() !== '' },
+        { key: 'versions_live', label: 'Версии в обращении', type: 'tags', placeholder: '1.0.0, 1.1.0',
+          when: n => String(n.schema || '').trim() !== '' && n.compat !== 'none',
+          hint: 'Пока идёт переход, потребитель обязан понимать все перечисленные' },
+        { key: 'on_unknown', label: 'Встретил незнакомую версию', type: 'select', default: 'ignore_unknown',
+          options: [['ignore_unknown','читать что понял, лишние поля игнорировать'],
+                    ['dlq','увести в изолятор'],['fail','остановиться']],
+          when: n => String(n.schema || '').trim() !== '' },
+        { key: 'group', label: 'Группа потребителей', type: 'text', placeholder: 'billing-workers',
+          hint: 'Одна группа = сообщение достаётся одному из её экземпляров, а не всем' },
+        { key: 'ack', label: 'Подтверждение', type: 'select', default: 'manual',
+          options: [['manual','вручную — удалять из очереди только после «сохранил»'],
+                    ['auto','автоматически при выдаче — потеря при падении потребителя']] },
+        { key: 'visibility_s', label: 'Не отдавать другим, с', type: 'number', default: 30.000, min: 0, step: 0.001,
+          when: n => n.ack === 'manual',
+          hint: 'Сколько сообщение невидимо после выдачи. Меньше времени обработки — заберёт второй потребитель' },
+        { key: 'prefetch', label: 'В работе у потребителя, шт', type: 'number', default: 1, min: 1, step: 1 },
+        { key: 'max_attempts', label: 'Попыток до изолятора', type: 'number', default: 5, min: 1, step: 1 },
+        { key: 'ordering', label: 'Порядок', type: 'select', default: 'none',
+          options: [['none','без гарантий — быстрее'],['by_key','строгий внутри ключа']] },
+        { key: 'partition_key', label: 'Ключ упорядочивания', type: 'text', placeholder: 'order_id',
+          when: n => n.ordering === 'by_key' },
+        { key: 'retention_h', label: 'Хранить сообщения, ч', type: 'number', default: 168, min: 1, step: 1 },
+        ...DEPLOY,
+        ...PATTERN,
+        ...ENVOVER,
+      ],
+      summary: p => (p.topic || 'тема не задана') +
+        (p.ack === 'auto' ? ' · без подтверждения' : ' · ACK') + ` · до ${p.max_attempts} попыток`,
+    },
+
+    /* Изолятор — куда уходит то, что не удалось обработать. Смысл не в хранении,
+       а в том, что конвейер БЕРЁТ СЛЕДУЮЩИЙ элемент: одна битая запись не
+       останавливает поток. Разбирается отдельно, блоком «Ремонт». */
+    dlq: {
+      label: 'Изолятор (DLQ)', category: 'io', color: '#f87171', icon: '⌦', buffer: true,
+      desc: 'Очередь ошибок: сбойные элементы складываются сюда, а конвейер продолжает работу.',
+      inputs: [IN('in', 'сбойное', 'flow', true)],
+      outputs: [OUT('out', 'на разбор')],
+      params: [
+        { key: 'name', label: 'Имя изолятора', type: 'text', required: true, placeholder: 'orders.created.dlq',
+          hint: 'На него ссылается блок «Ремонт»' },
+        { key: 'store', label: 'Где лежит', type: 'select', default: 'same_broker',
+          options: [['same_broker','отдельная тема того же брокера'],['table','таблица в БД'],
+                    ['file','файлы на диске'],['object_storage','объектное хранилище']] },
+        /* Без причины и номера попытки разбирать изолятор нечем — останется
+           куча тел без объяснения, почему они здесь. */
+        { key: 'keep', label: 'Что сохраняем', type: 'tags',
+          default: ['тело','причина','стек','номер попытки','время первого сбоя','id корреляции'] },
+        { key: 'retention_days', label: 'Хранить, дней', type: 'number', default: 30, min: 1, step: 1 },
+        { key: 'alert_after', label: 'Тревога, если накопилось больше', type: 'number', default: 100, min: 0, step: 1,
+          hint: '0 — не тревожить' },
+        ...DEPLOY,
+        ...PATTERN,
+        ...ENVOVER,
+      ],
+      summary: p => (p.name || 'имя не задано') + ` · ${p.retention_days} дн`,
+    },
+
+    /* Ремонт — бесшовное лечение. Точка входа сбоку (entry): работает своим
+       темпом, параллельно основному потоку, и не требует его остановки. */
+    repair: {
+      label: 'Ремонт', category: 'flow', color: '#fbbf24', icon: '↺', entry: true,
+      desc: 'Разбор изолятора: берёт сбойные элементы пачками, чинит и возвращает в поток — не останавливая систему.',
+      inputs: [IN('in', 'вход', 'flow', true)],
+      outputs: p => withErr([OUT('out', 'вернуть в поток')], p),
+      params: [
+        { key: 'source', label: 'Какой изолятор разбираем', type: 'text', required: true, placeholder: 'orders.created.dlq',
+          hint: 'Имя из блока «Изолятор»' },
+        { key: 'trigger', label: 'Когда', type: 'select', default: 'manual',
+          options: [['manual','вручную'],['schedule','по расписанию'],['auto','сразу при попадании в изолятор']] },
+        { key: 'cron', label: 'Расписание (cron)', type: 'text', placeholder: '0 */2 * * *', when: n => n.trigger === 'schedule' },
+        { key: 'batch', label: 'Брать за раз, шт', type: 'number', default: 50, min: 1, step: 1 },
+        { key: 'rate_per_min', label: 'Не быстрее, шт/мин', type: 'number', default: 0, min: 0, step: 1,
+          hint: '0 — без ограничения. Ограничьте, чтобы разбор не добил уже больную систему' },
+        { key: 'action', label: 'Что делаем с починенным', type: 'select', default: 'requeue_original',
+          options: [['requeue_original','вернуть в исходную тему'],['requeue_other','отправить в другую тему'],
+                    ['drop_marked','пометить и удалить']] },
+        { key: 'target_topic', label: 'Тема назначения', type: 'text', placeholder: 'orders.created.repaired',
+          when: n => n.action === 'requeue_other' },
+        { key: 'fix', label: 'Правило починки', type: 'code',
+          placeholder: 'что именно исправляем: добить недостающее поле, привести тип, отбросить дубль…' },
+        { key: 'on_error', label: 'Если и ремонт не смог', type: 'select', default: 'drop_marked',
+          options: [['drop_marked','оставить в изоляторе с пометкой'],['stop','остановить разбор'],
+                    ['route','увести по проводу']] },
+        ...DEPLOY,
+        ...PATTERN,
+      ],
+      summary: p => (p.source || 'изолятор не задан') +
+        ({ manual: ' · вручную', schedule: ' · ' + (p.cron || 'по расписанию'), auto: ' · сразу' })[p.trigger],
     },
 
     merge: {
@@ -224,7 +504,7 @@ window.BLOCKS = (function () {
       label: 'Направление анализа', category: 'flow', color: '#d946ef', icon: '⊟',
       desc: 'Карточка одного пункта меню. Раскладывает направление на подпункты и раздаёт их экспертам — по порту на каждый подпункт.',
       inputs: [IN('in', 'вход', 'flow', true)],
-      outputs: p => parseOptions(p.items).filter(o => o.level === 0).map(o => OUT(o.key, o.label)),
+      outputs: p => withErr(parseOptions(p.items).filter(o => o.level === 0).map(o => OUT(o.key, o.label)), p),
       params: [
         { key: 'title', label: 'Направление', type: 'text', default: 'Баги', required: true },
         { key: 'items', label: 'Подпункты: «ключ = подпись», по порту на каждый', type: 'textarea', required: true,
@@ -233,7 +513,7 @@ window.BLOCKS = (function () {
           options: [['all','все подпункты направления'],['selected','только отмеченные пользователем']] },
         { key: 'concurrency', label: 'Экспертов одновременно', type: 'number', default: 6, min: 1, step: 1 },
         { key: 'on_error', label: 'Если эксперт упал', type: 'select', default: 'skip',
-          options: [['skip','пропустить его находки'],['retry','повторить'],['stop','остановить направление']] },
+          options: [['skip','пропустить его находки'],['retry','повторить'],['stop','остановить направление'],['route','увести по проводу']] },
         { key: 'output_var', label: 'Запись о раздаче в', type: 'text', default: 'ctx.direction' },
       ],
       summary: p => `${parseOptions(p.items).filter(o => o.level === 0).length} подпунктов · ` +
@@ -245,14 +525,19 @@ window.BLOCKS = (function () {
       label: 'Задание', category: 'work', color: '#8b7cf6', icon: '▤',
       desc: 'Единица работы с текстовой инструкцией.',
       inputs: [IN('in', 'вход', 'flow', true), IN('kb', 'знания', 'data', true)],
-      outputs: [OUT('out', 'дальше')],
+      outputs: p => withErr([OUT('out', 'дальше')], p),
       params: [
         { key: 'instruction', label: 'Инструкция', type: 'textarea', required: true, placeholder: 'что нужно сделать…' },
-        { key: 'inputs', label: 'Входные переменные', type: 'tags', placeholder: 'ctx.symbol' },
+        { key: 'inputs', label: 'Входные переменные', type: 'tags', placeholder: 'ctx.symbol' , reads: true },
         { key: 'output_var', label: 'Записать в', type: 'text', default: 'ctx.result' },
         { key: 'timeout_s', label: 'Таймаут, с', type: 'number', default: 120.000, step: 0.001 },
         { key: 'on_error', label: 'При ошибке', type: 'select', default: 'fail',
-          options: [['fail','остановить'],['continue','продолжить'],['retry','повторить']] },
+          options: [['fail','остановить'],['continue','продолжить'],['retry','повторить'],['route','увести по проводу']] },
+        ...RETRY(0),
+        ...BREAKER,
+        ...DEPLOY,
+        ...PATTERN,
+        ...LOAD,
       ],
       summary: p => (p.instruction || '').split('\n')[0] || '—',
     },
@@ -284,9 +569,12 @@ window.BLOCKS = (function () {
         { key: 'tools', label: 'Инструменты', type: 'tags', placeholder: 'web_search' },
         { key: 'graph_in', label: 'Вход «карта»: принимать граф связей отдельным data-портом', type: 'bool', default: false },
         { key: 'output_var', label: 'Записать в', type: 'text', default: 'ctx.answer' },
-        { key: 'retry', label: 'Повторы', type: 'number', default: 2, min: 0, step: 1 },
+        ...RETRY(2),
         { key: 'timeout_s', label: 'Таймаут, с', type: 'number', default: 180.000, step: 0.001 },
         { key: 'stream', label: 'Стриминг', type: 'bool', default: false },
+        ...BREAKER,
+        ...DEPLOY,
+        ...PATTERN,
       ],
       summary: p => {
         if (p.provider !== 'project') return p.model || 'модель не задана';
@@ -315,7 +603,7 @@ window.BLOCKS = (function () {
           options: [['primary','основная'],['heavy','тяжёлая']] },
         { key: 'temperature', label: 'Temperature', type: 'number', default: 0.000, step: 0.001, min: 0, max: 2 },
         { key: 'max_tokens', label: 'Потолок ответа', type: 'number', default: 8192, min: 1, step: 1 },
-        { key: 'retry', label: 'Повторы', type: 'number', default: 2, min: 0, step: 1 },
+        ...RETRY(2),
         { key: 'timeout_s', label: 'Таймаут, с', type: 'number', default: 600.000, step: 0.001 },
         { key: 'output_var', label: 'Находки в', type: 'text', default: 'ctx.findings_expert' },
       ],
@@ -329,7 +617,7 @@ window.BLOCKS = (function () {
       label: 'Группа экспертов', category: 'work', color: '#a78bfa', icon: '◈',
       desc: 'Одна карточка на всё направление. Эксперты — строки состава, а не отдельные блоки: у них одинаковые входы и выходы, отличаются только поля. Порта на эксперта нет, разветвление происходит внутри.',
       inputs: [IN('in', 'вход', 'flow', true), IN('kb', 'контекст', 'data', true)],
-      outputs: [OUT('out', 'находки')],
+      outputs: p => withErr([OUT('out', 'находки')], p),
       params: [
         { key: 'title', label: 'Направление группы', type: 'text', required: true, default: 'Баги' },
 
@@ -338,14 +626,14 @@ window.BLOCKS = (function () {
         { key: 'temperature', label: 'Температура', type: 'number', default: 0.000, step: 0.001, min: 0, max: 2 },
         { key: 'max_tokens', label: 'Потолок ответа', type: 'number', default: 8192, min: 1, step: 1 },
         { key: 'timeout_s', label: 'Таймаут, с', type: 'number', default: 600.000, step: 0.001 },
-        { key: 'retry', label: 'Повторы', type: 'number', default: 2, min: 0, step: 1 },
+        ...RETRY(2),
         { key: 'scope', label: 'Где ищут по умолчанию', type: 'select', default: 'graph_then_code',
           options: [['graph_then_code','сначала граф, потом код'],['code','только код'],['graph','только граф']] },
         { key: 'tools', label: 'Инструменты — общие для всех строк', type: 'tags', default: ['graph_query','code_read'] },
         { key: 'concurrency', label: 'Одновременно', type: 'number', default: 6, min: 1, step: 1 },
         { key: 'on_error', label: 'Если эксперт упал', type: 'select', default: 'mark',
           options: [['mark','пропустить, но пометить направление неполным'],['skip','пропустить молча'],
-                    ['retry','повторить'],['stop','остановить группу']] },
+                    ['retry','повторить'],['stop','остановить группу'],['route','увести по проводу']] },
         { key: 'rules', label: 'Правила направления — общие для всех строк', type: 'textarea',
           placeholder: 'что запрещено утверждать, без чего находка не выдаётся' },
         { key: 'ignores', label: 'Что не трогают', type: 'tags', default: ['стиль','форматирование','именование'] },
@@ -370,6 +658,8 @@ window.BLOCKS = (function () {
           ] },
 
         { key: 'output_var', label: 'Свод группы в', type: 'text', default: 'ctx.findings_group' },
+        ...DEPLOY,
+        ...PATTERN,
       ],
       summary: p => `${p.title || '—'} · ${(p.experts || []).length} экспертов`,
       chips: p => {
@@ -388,7 +678,7 @@ window.BLOCKS = (function () {
       label: 'Скрипт', category: 'work', color: '#fb7185', icon: '>_',
       desc: 'Системный скрипт: PowerShell / bash / python / node. Порт «знания» — если скрипт работает по графу проекта, а не по файлам.',
       inputs: [IN('in', 'вход', 'flow', true), IN('kb', 'знания', 'data', true)],
-      outputs: [OUT('out', 'дальше')],
+      outputs: p => withErr([OUT('out', 'дальше')], p),
       params: [
         { key: 'runtime', label: 'Среда', type: 'select', default: 'powershell',
           options: [['powershell','PowerShell'],['bash','bash'],['python','python'],['cmd','cmd'],['node','node']] },
@@ -398,9 +688,129 @@ window.BLOCKS = (function () {
         { key: 'timeout_s', label: 'Таймаут, с', type: 'number', default: 60.000, step: 0.001 },
         { key: 'output_var', label: 'Записать stdout в', type: 'text', default: 'ctx.stdout' },
         { key: 'on_error', label: 'При ошибке', type: 'select', default: 'fail',
-          options: [['fail','остановить'],['continue','продолжить'],['retry','повторить']] },
+          options: [['fail','остановить'],['continue','продолжить'],['retry','повторить'],['route','увести по проводу']] },
+        ...RETRY(0),
+        ...BREAKER,
+        ...DEPLOY,
+        ...PATTERN,
+        ...LOAD,
       ],
       summary: p => `${p.runtime} · ${(p.code || '').split('\n')[0].slice(0, 28)}`,
+    },
+
+    /* Единица развёртывания — НЕ шаг конвейера, а описание контура: что
+       упаковано в один контейнер, как поднимается после падения и по чему
+       считается живым. Портов нет намеренно — это описатель, как «Заметка»,
+       иначе он полез бы в очередь выполнения и врал бы про порядок.
+       Границей изоляции сбоя становится именно он: падение внутри контура
+       лечится перезапуском контура, а не остановкой соседей. */
+    unit: {
+      label: 'Единица развёртывания', category: 'io', color: '#38bdf8', icon: '▣',
+      desc: 'Контур изоляции: образ, реплики, политика перезапуска, проверка живости и лимиты.',
+      inputs: [], outputs: [],
+      params: [
+        { key: 'name', label: 'Имя контура', type: 'text', required: true, placeholder: 'billing-worker',
+          hint: 'На него ссылаются блоки полем «Единица развёртывания»' },
+        /* Ответственность — свойство КОНТУРА, а не каждого блока: по той же
+           причине, по которой здесь живут логи. Контур это то, что падает и
+           перезапускается целиком, значит и звать по нему надо одного.
+           Не путать с «Кто делает» в Стройке: там — кто пишет код прямо
+           сейчас, здесь — кто отвечает за кусок системы дальше. */
+        { key: 'owner', label: 'Кто отвечает', type: 'text', placeholder: 'команда платежей · Иван · я',
+          hint: 'Кому звонить, когда контур упал, и с кем договариваться, чтобы менять его границу' },
+        { key: 'image', label: 'Образ', type: 'text', placeholder: 'registry.example.com/billing-worker:1.4.0' },
+        { key: 'replicas', label: 'Реплик', type: 'number', default: 1, min: 1, step: 1 },
+
+        /* Портов может не быть вовсе: обработчик, читающий из брокера, наружу
+           не слушает ничего. Поэтому список, а не одно поле, и пустой по
+           умолчанию — иначе у каждого воркера появился бы выдуманный 8080. */
+        { key: 'ports', label: 'Порты сервиса', type: 'list', default: [],
+          itemLabel: it => (it.port ? String(it.port) : '?') + (it.name ? ' · ' + it.name : ''),
+          itemBadge: it => it.expose || '',
+          item: [
+            { key: 'port', label: 'Порт', type: 'number', required: true, min: 1, step: 1, placeholder: '8080' },
+            { key: 'protocol', label: 'Протокол', type: 'select', default: 'http',
+              options: [['http','HTTP'],['https','HTTPS'],['grpc','gRPC'],['ws','WebSocket'],
+                        ['tcp','TCP'],['udp','UDP']] },
+            { key: 'name', label: 'Зачем', type: 'text', placeholder: 'api · метрики · админка' },
+            { key: 'expose', label: 'Кому виден', type: 'select', default: 'cluster',
+              options: [['internal','только внутри контура'],['cluster','соседним контурам'],
+                        ['public','наружу, за периметр']] },
+          ] },
+
+        /* Порядок запуска. Политика перезапуска лечит падение, но не отвечает
+           на «не поднимайся раньше шины»: без этого первый старт системы —
+           лотерея из гонок и лишних перезапусков. */
+        /* Сетевая граница. Кто с кем говорит ВНУТРИ системы, схема уже знает —
+           это связи между блоками разных контуров, и дублировать их списком
+           значило бы завести второй источник правды, который разойдётся.
+           Поэтому здесь только то, чего в графе нет: политика по умолчанию и
+           внешние адреса за периметром. */
+        { key: 'network', label: 'Сетевая политика', type: 'select', default: 'deny_by_default',
+          options: [['deny_by_default','запрещено всё, кроме связей из схемы'],
+                    ['open','разрешено всё внутри кластера']] },
+        { key: 'egress_external', label: 'Куда пускаем наружу', type: 'tags',
+          placeholder: 'billing.internal:443, api.stripe.com:443',
+          when: n => n.network !== 'open',
+          hint: 'Адреса за периметром. Внутренние связи брать отсюда не надо — они уже в схеме' },
+
+        { key: 'depends_on', label: 'Поднимать после', type: 'tags', placeholder: 'rabbitmq, postgres',
+          hint: 'Имена контуров, без которых этот не заработает' },
+        { key: 'wait_for', label: 'Ждать, пока они', type: 'select', default: 'healthy',
+          options: [['healthy','пройдут проверку живости'],['started','просто запустятся']],
+          when: n => (n.depends_on || []).length > 0,
+          hint: '«Просто запустятся» почти всегда мало: контейнер поднялся ≠ сервис принимает' },
+
+        { key: 'restart', label: 'Политика перезапуска', type: 'select', default: 'on-failure',
+          options: [['on-failure','при падении — перезапускать'],['always','всегда'],
+                    ['unless-stopped','всегда, кроме остановленных вручную'],['no','не перезапускать']] },
+        { key: 'restart_max', label: 'Попыток перезапуска', type: 'number', default: 5, min: 1, step: 1,
+          when: n => n.restart === 'on-failure',
+          hint: 'Без потолка падающий контур будет крутиться в вечном цикле и жечь ресурсы' },
+        { key: 'restart_delay_s', label: 'Пауза перед перезапуском, с', type: 'number', default: 5.000, min: 0, step: 0.001,
+          when: n => n.restart !== 'no' },
+
+        /* Без проверки живости перезапуск лечит только падение процесса.
+           Зависший, но не упавший контейнер оркестратор считает здоровым. */
+        { key: 'health', label: 'Чем проверяем живость', type: 'select', default: 'http',
+          options: [['http','HTTP-запрос'],['tcp','TCP-порт'],['cmd','команда внутри контейнера'],['none','не проверяем']] },
+        { key: 'health_path', label: 'Путь проверки', type: 'text', default: '/healthz', when: n => n.health === 'http' },
+        { key: 'health_port', label: 'Порт', type: 'number', default: 8080, min: 1, step: 1,
+          when: n => n.health === 'http' || n.health === 'tcp' },
+        { key: 'health_cmd', label: 'Команда', type: 'text', placeholder: 'pg_isready -U app', when: n => n.health === 'cmd' },
+        { key: 'health_interval_s', label: 'Проверять каждые, с', type: 'number', default: 10.000, min: 0, step: 0.001,
+          when: n => n.health !== 'none' },
+        { key: 'health_timeout_s', label: 'Ждать ответа, с', type: 'number', default: 3.000, min: 0, step: 0.001,
+          when: n => n.health !== 'none' },
+        { key: 'health_retries', label: 'Провалов подряд до «мёртв»', type: 'number', default: 3, min: 1, step: 1,
+          when: n => n.health !== 'none' },
+        { key: 'start_period_s', label: 'Дать на запуск, с', type: 'number', default: 20.000, min: 0, step: 0.001,
+          when: n => n.health !== 'none',
+          hint: 'Пока идёт, провалы проверки не считаются — иначе медленный старт выглядит как падение' },
+
+        { key: 'cpu_limit', label: 'Потолок CPU, ядер', type: 'number', default: 1.000, min: 0, step: 0.001 },
+        { key: 'mem_limit_mb', label: 'Потолок памяти, МБ', type: 'number', default: 512, min: 1, step: 1,
+          hint: 'Лимит и есть граница сбоя: утечка внутри контура убьёт контур, а не соседей' },
+        { key: 'stop_grace_s', label: 'Дать на корректное завершение, с', type: 'number', default: 10.000, min: 0, step: 0.001,
+          hint: 'Успеть дообработать текущее и подтвердить брокеру, иначе сообщение вернётся дублем' },
+
+        /* Только ИМЕНА переменных: значения секретов в план не попадают
+           никогда — так же, как у моделей хранится лишь имя env-переменной. */
+        { key: 'env_keys', label: 'Переменные окружения (имена)', type: 'tags',
+          placeholder: 'DATABASE_URL, BROKER_URL' },
+        /* Логи — свойство контура: это он живёт в контейнере и пишет в stdout.
+           Поэтому «все сервисы пишут в единую систему» выражается здесь, а не
+           полем у каждого блока. */
+        { key: 'logs_to', label: 'Логи пишем в', type: 'text', placeholder: 'central-logs',
+          hint: 'Имя из блока «Мониторинг»' },
+        { key: 'log_level', label: 'Уровень логов', type: 'select', default: 'info',
+          options: [['debug','debug — всё подряд'],['info','info'],['warn','warn'],['error','error — только сбои']] },
+        { key: 'metrics', label: 'Метрики наружу', type: 'tags',
+          placeholder: 'обработано/с, время шага, длина очереди, доля ошибок' },
+        ...ENVOVER,
+      ],
+      summary: p => (p.name || 'имя не задано') +
+        (p.replicas > 1 ? ` ×${p.replicas}` : '') + ' · ' + (p.restart || 'on-failure'),
     },
 
     /* ── ДАННЫЕ ──────────────────────────────────────────── */
@@ -526,6 +936,12 @@ window.BLOCKS = (function () {
         { key: 'redact_secrets', label: 'Вырезать секреты перед сохранением', type: 'bool', default: true },
         { key: 'store_snippets', label: 'Хранить фрагменты кода вместе с находкой', type: 'bool', default: false },
         { key: 'output_var', label: 'Идентификатор прогона в', type: 'text', default: 'ctx.run_id' },
+        ...IDEM_ON('dedupe_key'),
+        ...DEPLOY,
+        ...PATTERN,
+        ...OUTBOX,
+        ...LOAD,
+        ...ENVOVER,
       ],
       summary: p => `${(p.writes || []).join(', ') || '—'} → ${p.target} · ` +
                     `${({ forever: 'бессрочно', days: p.keep_days + ' дн.', until_paid: 'до оплаты → бессрочно' })[p.keep] || ''}`,
@@ -582,6 +998,224 @@ window.BLOCKS = (function () {
       summary: p => p.title || '',
     },
 
+    /* Мониторинг — единая точка, куда пишут ВСЕ контуры. Не шаг конвейера, а
+       описание системы наблюдения: куда пишем, в каком виде и что обязано быть
+       в каждой записи. Без сквозного ключа корреляции логи разных сервисов —
+       это просто отдельные кучи строк, по которым не собрать путь одного
+       элемента через систему. */
+    monitor: {
+      label: 'Мониторинг', category: 'io', color: '#a78bfa', icon: '◎',
+      desc: 'Централизованный сбор структурированных логов, метрик и тревог: куда пишем, что обязано быть в записи, на что тревожимся.',
+      inputs: [], outputs: [],
+      params: [
+        { key: 'name', label: 'Имя системы', type: 'text', required: true, placeholder: 'central-logs',
+          hint: 'На него ссылаются контуры полем «Логи пишем в»' },
+        { key: 'sink', label: 'Куда пишем', type: 'select', default: 'loki',
+          options: [['loki','Grafana Loki'],['elasticsearch','Elasticsearch / OpenSearch'],
+                    ['cloudwatch','CloudWatch Logs'],['datadog','Datadog'],['otlp','OpenTelemetry (OTLP)'],
+                    ['stdout_collector','stdout — забирает сборщик'],['file','файлы на диске']] },
+        { key: 'endpoint', label: 'Адрес приёмника', type: 'text', placeholder: 'http://loki:3100',
+          when: n => n.sink !== 'stdout_collector' && n.sink !== 'file' },
+        { key: 'format', label: 'Формат записи', type: 'select', default: 'json',
+          options: [['json','JSON — машиночитаемо'],['logfmt','logfmt'],['text','простой текст — разбирать нечем']] },
+        /* Ключ корреляции обязателен по смыслу: он и есть то, что превращает
+           разрозненные логи в путь одного элемента через все сервисы. */
+        { key: 'correlation_key', label: 'Ключ корреляции', type: 'text', default: 'trace_id', required: true,
+          hint: 'Сквозной идентификатор: рождается на входе и едет с элементом через все контуры' },
+        { key: 'fields', label: 'Обязательные поля записи', type: 'tags',
+          default: ['ts','level','service','trace_id','message_id','attempt','error'] },
+        { key: 'retention_days', label: 'Хранить логи, дней', type: 'number', default: 30, min: 1, step: 1 },
+        { key: 'sampling_pct', label: 'Доля обычных записей, %', type: 'number', default: 100, min: 1, max: 100, step: 1,
+          hint: 'Прореживание нужно на потоке. Ошибки и тревоги сохраняются целиком независимо от этой доли' },
+        { key: 'alerts', label: 'Тревоги', type: 'list', default: [],
+          itemLabel: it => it.name || 'без имени',
+          itemBadge: it => it.channel || '',
+          item: [
+            { key: 'name', label: 'Название', type: 'text', required: true, placeholder: 'изолятор растёт' },
+            { key: 'on', label: 'На что смотрим', type: 'select', default: 'dlq_growth',
+              options: [['error_rate','доля ошибок'],['dlq_growth','рост изолятора'],
+                        ['breaker_open','предохранитель сработал'],['restart_loop','контур перезапускается по кругу'],
+                        ['latency','время обработки'],['no_traffic','поток прекратился']] },
+            { key: 'threshold', label: 'Порог', type: 'text', required: true, placeholder: '100 записей · 5% · 2.000 с' },
+            { key: 'window_m', label: 'За окно, мин', type: 'number', default: 5, min: 1, step: 1 },
+            { key: 'channel', label: 'Куда сообщить', type: 'text', required: true, placeholder: 'telegram: #ops' },
+          ] },
+        ...ENVOVER,
+      ],
+      summary: p => (p.name || 'имя не задано') + ' · ' + (p.format || 'json') +
+        ((p.alerts || []).length ? ' · тревог: ' + p.alerts.length : ' · без тревог'),
+    },
+
+    /* Решение — почему построено ИМЕННО ТАК. План отвечает на «что», заметка у
+       блока — на «что он делает»; на «почему не проще» не отвечает никто. И
+       через полгода — или в первом же задании исполнителю — лишний, на вид,
+       брокер выкидывают «для простоты», возвращая ровно ту связность, ради
+       снятия которой его и ставили. Ценность не в записи выбора, а в записи
+       ОТВЕРГНУТОГО: пока альтернативы нет на бумаге, её будут предлагать снова. */
+    decision: {
+      label: 'Решение', category: 'io', color: '#0ea5e9', icon: '⚖',
+      desc: 'Почему сделано так, а не проще: что решили, что отвергли, чем платим и что заставит пересмотреть.',
+      inputs: [], outputs: [],
+      params: [
+        { key: 'title', label: 'Что решили', type: 'text', required: true,
+          placeholder: 'шина вместо прямого вызова' },
+        { key: 'status', label: 'Состояние', type: 'select', default: 'accepted',
+          options: [['accepted','принято'],['trial','пробуем'],
+                    ['superseded','заменено другим'],['dropped','отменено']] },
+        { key: 'superseded_by', label: 'Каким решением заменено', type: 'text',
+          when: n => n.status === 'superseded', placeholder: 'прямой вызов с предохранителем' },
+        { key: 'date', label: 'Когда', type: 'text', placeholder: '2026-07-29' },
+        /* Привязка к тому, что в плане УЖЕ названо: контур, узор, сущность или
+           id блока. Иначе решение либо висит в воздухе, либо его пришлось бы
+           тащить в каждое задание целиком. */
+        { key: 'affects', label: 'К чему относится', type: 'tags',
+          placeholder: 'orders-api, приём-и-проверка, order',
+          hint: 'Имя контура, узора, сущности или id блока. По этому списку решение попадает в задания' },
+        { key: 'context', label: 'Что заставило решать', type: 'textarea',
+          placeholder: 'пиковая нагрузка валила биллинг, и с ним весь приём заказов' },
+        { key: 'rejected', label: 'Что отвергли и почему', type: 'textarea',
+          placeholder: 'прямой вызов с повторами — падение биллинга всё равно останавливает приём;\nобщая база — снимает изоляцию контуров' },
+        { key: 'costs', label: 'Чем платим', type: 'textarea',
+          placeholder: 'согласованность стала отложенной; появился изолятор, за которым надо следить' },
+        { key: 'revisit', label: 'Что заставит пересмотреть', type: 'text',
+          placeholder: 'если поток упадёт ниже 5/с — шина станет дороже пользы',
+          hint: 'Решение без условия пересмотра со временем превращается в догму' },
+      ],
+      summary: p => (p.title || 'не записано') + ' · ' +
+        ({ accepted: 'принято', trial: 'пробуем', superseded: 'заменено', dropped: 'отменено' }[p.status] || 'принято'),
+    },
+
+    /* Узор — объявление того, что кусок схемы повторяется. Размножать блоки
+       умеет дублирование; здесь УЧЁТ: кто чей повтор и где копии разошлись.
+       Без него пять одинаковых веток — просто пять похожих веток: правку
+       донесут до одной, а строить будут пять раз с нуля. */
+    pattern: {
+      label: 'Узор', category: 'io', color: '#22c55e', icon: '❖',
+      desc: 'Повторяющийся кусок схемы: что в нём одинаково у всех повторов, а что отличается.',
+      inputs: [], outputs: [],
+      params: [
+        { key: 'name', label: 'Имя', type: 'text', required: true, placeholder: 'приём-и-проверка',
+          hint: 'На него ссылаются блоки полем «Узор»' },
+        { key: 'purpose', label: 'Что делает этот кусок', type: 'text',
+          placeholder: 'принять пачку, проверить, положить в шину' },
+        /* Всё, что НЕ перечислено здесь, обязано совпадать у всех повторов.
+           Список, а не «сравнивать по-умному»: осознанное отличие должно быть
+           записано, иначе его не отличить от невнесённой правки. */
+        { key: 'varies', label: 'Что отличается между повторами', type: 'tags',
+          placeholder: 'topic, source, output_var, unit',
+          hint: 'Ключи параметров. Всё остальное конструктор требует держать одинаковым' },
+        /* Отдельно от varies: там ключи ПОЛЕЙ, а это про связи, ключа у них нет.
+           Выключатель нужен, иначе законное отличие даёт вечное замечание — и
+           человек снимает пометку узора совсем, теряя заодно сверку параметров. */
+        { key: 'shape_varies', label: 'Связи у повторов разные', type: 'bool', default: false,
+          hint: 'Обычно повторы соединены одинаково, и это проверяется. Включите, если один повтор сознательно ходит не туда, куда остальные' },
+
+        /* Узор и окружения перемножаются: пять повторов на три окружения — это
+           пятнадцать строк, набранных руками и разъезжающихся поодиночке.
+           Отличие, одинаковое у всех повторов, объявляется ЗДЕСЬ один раз и
+           относится к роли, а не к блоку. Значение, СВОЁ у каждого повтора,
+           по-прежнему живёт на блоке: одно на всех оно и не могло бы быть. */
+        { key: 'env_over', label: 'Отличия по окружениям — общие для всех повторов', type: 'list', default: [],
+          itemLabel: it => `${it.env || '?'} · ${it.role || '?'} · ${it.key || '?'}` +
+            (it.value === '' || it.value === undefined ? '' : ' = ' + it.value),
+          itemBadge: it => it.env || '',
+          item: [
+            { key: 'env', label: 'Окружение', type: 'text', required: true, placeholder: 'dev' },
+            { key: 'role', label: 'У какой роли', type: 'text', required: true, placeholder: 'вход' },
+            { key: 'key', label: 'Какой параметр', type: 'text', required: true, placeholder: 'interval_s' },
+            { key: 'value', label: 'Значение там', type: 'text', required: true, placeholder: '600.000' },
+            { key: 'why', label: 'Почему иначе', type: 'text', placeholder: 'не долбить мок каждую минуту' },
+          ] },
+      ],
+      summary: p => (p.name || 'имя не задано') +
+        ((p.varies || []).length ? ` · отличается: ${(p.varies || []).join(', ')}` : ' · одинаково всё'),
+    },
+
+    /* Окружение — где именно живёт построенная система: боевое, предбоевое,
+       разработка. Не путать со «средой исполнения» в жгуте (клиент/сервер/
+       внешнее): та про то, ГДЕ выполняется блок, это — про то, В КАКОМ
+       экземпляре системы. Портов нет: описатель, как контур и мониторинг.
+       Копий плана на каждое окружение не заводим намеренно — они разойдутся
+       через неделю. План один, отличия перечислены на самих блоках. */
+    env: {
+      label: 'Окружение', category: 'io', color: '#f97316', icon: '⊞',
+      desc: 'Экземпляр системы: боевой, предбоевой, разработка. Откуда берёт значения и какие в нём данные.',
+      inputs: [], outputs: [],
+      params: [
+        { key: 'name', label: 'Имя', type: 'text', required: true, placeholder: 'prod',
+          hint: 'На него ссылаются «Отличия по окружениям» в блоках' },
+        /* Базовое — то, чьи значения стоят прямо в полях блоков. Без него
+           непонятно, что означают числа в плане: боевые или отладочные. */
+        { key: 'base', label: 'Значения в полях плана — его', type: 'bool', default: false },
+        { key: 'purpose', label: 'Для чего', type: 'text',
+          placeholder: 'боевой · проверка перед боем · разработка' },
+        { key: 'config_source', label: 'Откуда берёт значения', type: 'select', default: 'env_file',
+          options: [['env_file','.env файл'],['values_yaml','values.yaml (Helm)'],
+                    ['configmap','ConfigMap / Secret'],['profile','профиль приложения'],
+                    ['ci_vars','переменные CI/CD'],['manual','руками при развёртывании']] },
+        /* Данные — не бюрократия: копия боевой базы на стенде это и утечка,
+           и причина, по которой «у нас воспроизводится, а у вас нет». */
+        { key: 'data', label: 'Данные', type: 'select', default: 'synthetic',
+          options: [['real','настоящие'],['anonymized','копия боевых, обезличенная'],
+                    ['synthetic','сгенерированные'],['empty','пусто']] },
+      ],
+      summary: p => (p.name || 'имя не задано') + (p.base ? ' · базовое' : '') +
+        ' · ' + (p.data === 'real' ? 'настоящие данные' : p.data === 'anonymized' ? 'обезличенные'
+                 : p.data === 'empty' ? 'пусто' : 'сгенерированные'),
+    },
+
+    /* Сущность — словарь предметной области. Схема знает, что «ctx.order»
+       кто-то пишет, а кто-то читает, но НЕ знает, что внутри. Пока формы нет,
+       каждый блок строится по своему заданию, и два исполнителя честно
+       придумывают две разные формы одного заказа — расходится не связь, а
+       смысл, и вскрывается это уже на стыке готового кода.
+       Портов нет намеренно: это описатель, а не шаг. На холсте он виден
+       карточкой, потому что словарь, спрятанный в настройках, никто не читает. */
+    entity: {
+      label: 'Сущность', category: 'data', color: '#e879f9', icon: '⬡',
+      desc: 'Что за данные ходят по схеме: поля, чем опознаётся, кто хозяин. Одна форма на всех, кто её читает и пишет.',
+      inputs: [], outputs: [],
+      params: [
+        { key: 'key', label: 'Как зовут в коде', type: 'text', required: true, placeholder: 'order',
+          hint: 'Короткое имя без пробелов — по нему на сущность ссылаются поля других сущностей' },
+
+        /* Связь со схемой — через имена переменных, а не через провода: одна и
+           та же сущность едет по разным веткам под разными именами, и рисовать
+           к ней провод от каждого читателя значило бы закрыть холст паутиной. */
+        { key: 'vars', label: 'Живёт в переменных', type: 'tags',
+          placeholder: 'ctx.order, ctx.paid_order',
+          hint: 'По ним конструктор сверяет читаемые поля с этим списком' },
+
+        { key: 'fields', label: 'Поля', type: 'list', default: [],
+          itemLabel: it => it.name || 'без имени',
+          itemBadge: it => it.kind || '',
+          item: [
+            { key: 'name', label: 'Имя', type: 'text', required: true, placeholder: 'total' },
+            { key: 'kind', label: 'Что это', type: 'select', default: 'string',
+              options: [['string','строка'],['number','число'],['bool','да/нет'],['ts','дата и время'],
+                        ['money','деньги'],['enum','одно из перечисленных'],['list','список'],
+                        ['object','вложенный объект'],['ref','ссылка на сущность']] },
+            { key: 'ref', label: 'На какую сущность', type: 'text', placeholder: 'customer',
+              when: it => it.kind === 'ref' },
+            { key: 'values', label: 'Допустимые значения', type: 'tags',
+              placeholder: 'new, paid, shipped', when: it => it.kind === 'enum' },
+            { key: 'required', label: 'Обязательное', type: 'bool', default: true },
+            { key: 'note', label: 'Пояснение', type: 'text', placeholder: 'в копейках, без НДС' },
+          ] },
+
+        { key: 'id_field', label: 'Чем опознаётся', type: 'text', placeholder: 'id',
+          hint: 'Одно из полей выше. Отсюда берётся ключ идемпотентности и ключ раскладки по разделам' },
+
+        /* Хозяин данных — микросервисный вопрос, а не бюрократия: если менять
+           заказ может кто угодно, изоляция контуров кончается на общей таблице. */
+        { key: 'owner', label: 'Хозяин данных', type: 'text', placeholder: 'orders-api',
+          hint: 'Имя контура, который один имеет право менять эту сущность. Остальные читают' },
+      ],
+      summary: p => (p.key || 'ключ не задан') +
+        ((p.fields || []).length ? ` · полей ${p.fields.length}` : ' · полей нет') +
+        (p.owner ? ' · ' + p.owner : ''),
+    },
+
     note: {
       label: 'Заметка', category: 'io', color: '#64748b', icon: '✎',
       desc: 'Комментарий на холсте. В выполнении не участвует.',
@@ -598,17 +1232,17 @@ window.BLOCKS = (function () {
        и человек, и ИИ видят, что заполнить, и не тащат мусор из другого проекта. */
 
     input: {
-      label: 'Вход данных', category: 'flow', color: '#22d3ee', icon: '⤓',
+      label: 'Вход данных', category: 'flow', color: '#22d3ee', icon: '⤓', entry: true,
       desc: 'УНИВЕРСАЛЬНЫЙ вход: откуда берутся данные — API, вебхук, поток, файл, база, лента, ручной ввод. Предметной области не знает: годится для новостей, сообщений, метрик, трафика, заявок, прайсов. Отдаёт полученное дальше по потоку и, при надобности, пунктиром как знания.',
       inputs: [IN('in', 'вход', 'flow', true)],
-      outputs: [OUT('out', 'дальше'), OUT('data', 'данные', 'data')],
+      outputs: p => withErr([OUT('out', 'дальше'), OUT('data', 'данные', 'data')], p),
       params: [
         { key: 'kind', label: 'Откуда', type: 'select', default: 'api',
           options: [['api','API-запрос'],['webhook','вебхук (приходит к нам)'],['stream','поток / подписка'],
                     ['feed','лента RSS/Atom'],['file','файл или папка'],['db','база данных'],
                     ['scrape','страница сайта'],['manual','ручной ввод']] },
         { key: 'source', label: 'Адрес источника', type: 'text', required: true,
-          placeholder: 'https://api.example.com/v1/messages  |  каналы @a, @b  |  postgres://…' },
+          placeholder: 'https://api.example.com/v1/messages  |  каналы @a, @b  |  postgres://…' , egress: true },
         { key: 'method', label: 'Метод', type: 'select', default: 'GET',
           options: [['GET','GET'],['POST','POST']], when: p => p.kind === 'api' || p.kind === 'scrape' },
         { key: 'query', label: 'Запрос / параметры', type: 'textarea',
@@ -626,7 +1260,13 @@ window.BLOCKS = (function () {
         { key: 'dedupe_key', label: 'Ключ уникальности', type: 'text', placeholder: 'id — чтобы не брать одно и то же дважды' },
         { key: 'output_var', label: 'Записать в', type: 'text', placeholder: 'ctx.messages' },
         { key: 'on_error', label: 'При ошибке', type: 'select', default: 'retry',
-          options: [['fail','остановить'],['continue','продолжить'],['retry','повторить']] },
+          options: [['fail','остановить'],['continue','продолжить'],['retry','повторить'],['route','увести по проводу']] },
+        ...IDEM_ON('dedupe_key'),
+        ...BREAKER,
+        ...DEPLOY,
+        ...PATTERN,
+        ...LOAD,
+        ...ENVOVER,
       ],
       summary: p => `${p.kind || 'api'}${p.source ? ' · ' + p.source : ' · источник не задан'}`,
     },
@@ -635,7 +1275,7 @@ window.BLOCKS = (function () {
       label: 'Обработка', category: 'work', color: '#a78bfa', icon: '⚗',
       desc: 'УНИВЕРСАЛЬНЫЙ шаг обработки данных без вызова модели: отфильтровать, привести к виду, обогатить, убрать дубли, сгруппировать, посчитать, разметить по правилу. Что именно делать — в поле «Правило».',
       inputs: [IN('in', 'вход', 'flow', true), IN('kb', 'знания', 'data', true)],
-      outputs: [OUT('out', 'дальше'), OUT('data', 'результат', 'data')],
+      outputs: p => withErr([OUT('out', 'дальше'), OUT('data', 'результат', 'data')], p),
       params: [
         { key: 'op', label: 'Что делаем', type: 'select', default: 'filter',
           options: [['filter','отобрать нужное'],['map','привести к виду'],['enrich','обогатить'],
@@ -643,13 +1283,20 @@ window.BLOCKS = (function () {
                     ['score','оценить'],['join','объединить источники'],['split','разбить'],['clean','почистить']] },
         { key: 'rule', label: 'Правило', type: 'textarea', required: true,
           placeholder: 'словами или выражением: «оставить сообщения за 24ч со словами из списка»' },
-        { key: 'input_var', label: 'Что берём', type: 'text', placeholder: 'ctx.messages' },
+        { key: 'input_var', label: 'Что берём', type: 'text', placeholder: 'ctx.messages' , reads: true },
         { key: 'fields', label: 'Поля', type: 'tags', placeholder: 'text, author, ts' },
         { key: 'group_by', label: 'Группировать по', type: 'text', placeholder: 'канал, час', when: p => p.op === 'aggregate' },
         { key: 'window', label: 'Окно', type: 'text', placeholder: '24h', when: p => p.op === 'aggregate' || p.op === 'dedupe' },
         { key: 'output_var', label: 'Записать в', type: 'text', placeholder: 'ctx.filtered' },
         { key: 'on_error', label: 'При ошибке', type: 'select', default: 'fail',
-          options: [['fail','остановить'],['continue','продолжить'],['retry','повторить']] },
+          options: [['fail','остановить'],['continue','продолжить'],['retry','повторить'],['route','увести по проводу']] },
+        ...RETRY(0),
+        ...IDEM,
+        ...BREAKER,
+        ...DEPLOY,
+        ...PATTERN,
+        ...OUTBOX,
+        ...LOAD,
       ],
       summary: p => `${p.op || 'filter'}${p.rule ? ' · ' + String(p.rule).split('\n')[0] : ' · правило не задано'}`,
     },
@@ -658,26 +1305,33 @@ window.BLOCKS = (function () {
       label: 'Выход данных', category: 'io', color: '#34d399', icon: '⤒',
       desc: 'УНИВЕРСАЛЬНАЯ отдача наружу: отправить в API или вебхук, записать в базу или файл, послать сообщение в мессенджер, положить в очередь, показать на дашборде. В отличие от «Результата» ветка на нём не заканчивается — можно продолжить цепочку.',
       inputs: [IN('in', 'вход', 'flow', true)],
-      outputs: [OUT('out', 'дальше')],
+      outputs: p => withErr([OUT('out', 'дальше')], p),
       params: [
         { key: 'channel', label: 'Куда', type: 'select', default: 'api',
           options: [['api','API-запрос'],['webhook','вебхук'],['db','база данных'],['file','файл'],
                     ['message','сообщение в мессенджер'],['email','почта'],['queue','очередь'],
                     ['dashboard','дашборд'],['console','консоль']] },
         { key: 'target', label: 'Адрес назначения', type: 'text', required: true,
-          placeholder: 'https://hooks.example.com/…  |  @my_channel  |  out\\feed.json' },
+          placeholder: 'https://hooks.example.com/…  |  @my_channel  |  out\\feed.json' , egress: true },
         { key: 'method', label: 'Метод', type: 'select', default: 'POST',
           options: [['POST','POST'],['PUT','PUT'],['PATCH','PATCH']], when: p => p.channel === 'api' || p.channel === 'webhook' },
         { key: 'auth_env', label: 'Ключ доступа — имя переменной окружения', type: 'text',
           placeholder: 'WEBHOOK_TOKEN  (сам ключ в план не пишем)' },
-        { key: 'payload', label: 'Что отправляем', type: 'textarea', placeholder: 'ctx.digest  |  шаблон сообщения' },
+        { key: 'payload', label: 'Что отправляем', type: 'textarea', placeholder: 'ctx.digest  |  шаблон сообщения' , reads: true },
         { key: 'format', label: 'Формат', type: 'select', default: 'json',
           options: [['json','JSON'],['text','текст'],['markdown','Markdown'],['csv','CSV'],['html','HTML']] },
         { key: 'batch', label: 'Пачкой, штук', type: 'number', min: 1, step: 1, placeholder: '1 — по одному' },
         { key: 'rate_limit', label: 'Лимит, в минуту', type: 'number', min: 0, step: 1, placeholder: '0 — без лимита' },
-        { key: 'retry', label: 'Повторов', type: 'number', default: 2, min: 0, step: 1 },
+        ...RETRY(2),
         { key: 'on_error', label: 'При ошибке', type: 'select', default: 'retry',
-          options: [['fail','остановить'],['continue','продолжить'],['retry','повторить']] },
+          options: [['fail','остановить'],['continue','продолжить'],['retry','повторить'],['route','увести по проводу']] },
+        ...IDEM,
+        ...BREAKER,
+        ...DEPLOY,
+        ...PATTERN,
+        ...OUTBOX,
+        ...LOAD,
+        ...ENVOVER,
       ],
       summary: p => `${p.channel || 'api'}${p.target ? ' → ' + p.target : ' · адрес не задан'}`,
     },

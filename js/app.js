@@ -472,8 +472,34 @@ window.App = (function () {
     pill.textContent = errs ? errs : (warns ? warns : '');
     pill.className = 'pill ' + (errs ? 'err' : warns ? 'warn' : '');
 
+    /* Сводка по структуре — шапкой над находками: числа стоят прямо над тем,
+       что их объясняет. Балла нет намеренно, только измеримое; тревожные
+       значения подсвечиваем, чтобы не вчитываться в каждую цифру. */
+    const q = window.Graph.quality();
+    const qc = (val, label, hint, bad) =>
+      `<span class="qc ${bad ? 'bad' : ''}" title="${esc(hint)}"><b>${val}</b>${esc(label)}</span>`;
+    const qbar = `<div class="qbar">
+      ${qc(q.blocks, 'блоков', 'Сколько блоков в плане')}
+      ${qc(q.edges, 'связей', 'Связей выполнения; пунктир данных сюда не входит')}
+      ${qc(q.units, 'контуров', 'Единиц развёртывания — границ, за которые сбой не выходит')}
+      ${q.units ? qc(q.crossUnit, 'между контурами',
+          'Связей, пересекающих границу контура. Само по себе не плохо: так система и работает') : ''}
+      ${q.units ? qc(q.hardLinks, 'жёстких',
+          'Из них идущих напрямую, минуя буфер. Каждая такая — синхронный вызов чужого сервиса: он падает вместе с соседом',
+          q.hardLinks > 0) : ''}
+      ${q.crossOwner ? qc(q.crossOwner, 'через границу ответственности',
+          'Из жёстких — между контурами разных владельцев. Такую связь не развязать правкой, только договорённостью',
+          true) : ''}
+      ${qc(q.syncDepth, 'радиус поражения',
+          'Самая длинная цепочка блоков подряд без буфера. Настолько далеко уедет отказ одного блока, прежде чем упрётся во что-то умеющее копить',
+          q.syncDepth >= 4)}
+      ${q.units ? qc(q.unassigned, 'вне контура',
+          'Блоков, не приписанных ни к одной единице развёртывания: их нечем развернуть и нечем перезапустить',
+          q.unassigned > 0) : ''}
+    </div>`;
+
     const blocking = issues.filter(i => i.level !== 'todo');
-    document.getElementById('tab-check').innerHTML =
+    document.getElementById('tab-check').innerHTML = qbar +
       (blocking.length ? `<ul class="checks">${blocking.map(i =>
         `<li class="check ${i.level}" ${i.node ? `data-node="${i.node}"` : ''}>
            <span class="check-dot"></span>${esc(i.text)}</li>`).join('')}</ul>`
@@ -1060,12 +1086,22 @@ window.App = (function () {
 
   /* Сжатый бриф: ёмкие правила + текущий план минифицированным JSON. */
   function buildBrief() {
+    /* Список типов собираем из реестра, а не переписываем руками: набранный
+       вручную он отстал уже на пяти новых блоках, и ИИ узнавал о них последним. */
+    const cats = {};
+    for (const [t, d] of Object.entries(window.BLOCKS.TYPES)) (cats[d.category] = cats[d.category] || []).push(t);
     const rules = [
       'Ты дорабатываешь ПЛАН ПРОЕКТА в конструкторе Workbench. План = граф: узел=шаг (params — ТЗ шага), ребро=связь.',
       'ПОРТЫ: kind flow (порядок выполнения) либо data (знания/контекст). Ребро соединяет ТОЛЬКО одинаковые kind; from=выход, to=вход. Входы с multi берут несколько рёбер. У choice/direction по порту на пункт; у agent порт graph при graph_in:true.',
       'СХЕМА: узел {id,type,name,x,y,enabled,notes,params}; ребро {id,from:{node,port},to:{node,port},kind:"flow"|"data"}.',
       'ПРАВКА: меняй минимум, верни ВЕСЬ план ОДНИМ минифицированным JSON (без красивого форматирования, без прозы). id держи стабильными; новый узел id="<type>_<n>"; подними meta.rev +1. x/y любые — человек нажмёт авто-раскладку.',
-      'ТИПЫ: start,source,condition,loop,queue,merge,choice,direction (поток); task,agent,expert,expert_group,script (работа); kb,codegraph,context,transform (данные); output,store,paywall,progress,note (выход). Точные порты/params — в текущем плане ниже и в файле AI_GUIDE.md.',
+      'ТИПЫ: ' + Object.entries(cats).map(([c, ts]) => `${ts.join(',')} (${c})`).join('; ') +
+        '. Точные порты/params — в текущем плане ниже и в файле AI_GUIDE.md.',
+      'ОТВЕТСТВЕННОСТЬ: поле owner есть у unit («Кто отвечает»), блок его НАСЛЕДУЕТ от своего контура — своего owner у блока нет. Не путать с «кто делает» в Стройке: это про того, кто пишет код сейчас, и в план не входит.',
+      'РЕШЕНИЯ: узел decision хранит, ПОЧЕМУ сделано так, а не проще — title, status (accepted/trial/superseded/dropped), affects (имена контуров, узоров, сущностей или id блоков), context, rejected, costs, revisit. Заводи его, когда выбрал неочевидный путь: без записи отвергнутого его предложат заново. В задания попадают только принятые и пробуемые.',
+      'УЗОРЫ: повторяющийся кусок схемы объявляется узлом pattern (name, purpose, varies — ключи параметров, которыми повторы отличаются), а блоки-участники несут pattern + pattern_role (место в куске) + pattern_case (какой это повтор). Всё, чего нет в varies, обязано совпадать у всех повторов: такие куски строятся ОДНИМ переиспользуемым кодом. Сверяется и ФОРМА — набор связей между ролями; если у повторов она сознательно разная, ставь shape_varies:true.',
+      'ОКРУЖЕНИЯ: узел env — экземпляр системы (prod/stage/dev): name, base (чьи значения стоят в полях блоков), config_source, data. Отличия НЕ копией плана, а списком env_over на самом блоке: {env, key (ключ параметра ЭТОГО типа), value, why}. Значение обязано годиться по типу параметра.',
+      'СЛОВАРЬ: узел entity объявляет ФОРМУ данных — key (как зовут в коде), vars (в каких переменных живёт), fields (имя, вид, обязательность), id_field, owner. Если по схеме ходят предметные данные, объяви их сущностью: без общей формы каждый блок соберут по своей, и разойдётся не связь, а смысл.',
       'МОДЕЛИ ИИ в meta.models.primary/heavy: base_url+model+api_key_env (имя env-переменной, НЕ сам ключ); локальный (Ollama/LM Studio/vLLM) или облачный. agent/expert берут их через model_ref.',
       'КАРКАС СБОРКИ: порядок flow-связей = порядок сборки; каждый узел — маленький проверяемый шаг, не забегай вперёд; data-рёбра говорят, что питает шаг.',
       'Числа настроек — 3 знака после точки.',
@@ -1116,11 +1152,216 @@ window.App = (function () {
     return out.length ? out.map(s => '  ' + s).join('\n') : '  — наружу ничего не объявлено';
   }
 
+  /* Форма данных, с которыми работает блок. Контракт выше говорит, КАК зовут
+     переменную, но не что внутри: без этого исполнитель придумает свою форму, а
+     сосед — свою, и разойдётся не связь, а смысл. Берём только те сущности,
+     чьих переменных блок касается, — весь словарь в задание не нужен. */
+  /* Сущности, чьих переменных блок касается. Нужны двум секциям задания —
+     словарю и решениям, — поэтому вынесено отдельно. */
+  function entitiesOf(n) {
+    const ents = window.Graph.state.nodes.filter(e => e.type === 'entity');
+    if (!ents.length) return [];
+    const refs = [];
+    const push = v => { const s = String(v == null ? '' : v).trim(); if (s) refs.push(s); };
+    push(n.params.output_var);
+    for (const f of (window.BLOCKS.visibleParams(n.type, n.params) || [])) {
+      const val = n.params[f.key];
+      if (f.reads) (Array.isArray(val) ? val : [val]).forEach(push);
+      if (f.type === 'list') for (const it of (val || [])) push((it || {}).output_var);
+    }
+    const toks = refs.join(' ').split(/[,;\s]+/).filter(Boolean);
+    return ents.filter(e => ((e.params || {}).vars || []).some(v => {
+      const s = String(v).trim();
+      return s && toks.some(t => t === s || t.startsWith(s + '.'));
+    }));
+  }
+
+  function dictText(n) {
+    const used = entitiesOf(n);
+    if (!used.length) return null;
+
+    // подписи видов берём из самого блока, чтобы не заводить второй словарь
+    const item = ((window.BLOCKS.TYPES.entity.params || []).find(f => f.key === 'fields') || {}).item || [];
+    const opts = ((item.find(f => f.key === 'kind') || {}).options) || [];
+    const kind = k => (opts.find(o => o[0] === k) || [null, k || '?'])[1];
+
+    return used.map(e => {
+      const p = e.params || {};
+      const head = `• ${p.key || e.name}${p.owner ? ` · хозяин ${p.owner}` : ''}` +
+        `${p.id_field ? ` · опознаётся по ${p.id_field}` : ''}\n` +
+        `  переменные: ${(p.vars || []).join(', ') || '—'}`;
+      const fs = (p.fields || []).filter(f => f && f.name).map(f =>
+        `  - ${f.name}: ${kind(f.kind)}` +
+        (f.kind === 'ref' && f.ref ? ` → ${f.ref}` : '') +
+        (f.kind === 'enum' && (f.values || []).length ? ` (${f.values.join(' | ')})` : '') +
+        (f.required === false ? ', необязательное' : '') +
+        (f.note ? ' — ' + f.note : ''));
+      return head + (fs.length ? '\n' + fs.join('\n') : '\n  поля не перечислены');
+    }).join('\n');
+  }
+
+  /* Окружения. Значения в параметрах блока — базового окружения; прочие живут
+     отличиями. Без этой секции исполнитель зашьёт боевые числа и адреса в код,
+     и dev не поднимется. */
+  function envText(n) {
+    const envs = window.Graph.state.nodes.filter(e => e.type === 'env');
+    if (!envs.length) return null;
+    // подписи вариантов берём из самого блока, второго словаря не заводим
+    const lbl = (key, val) => {
+      const f = (window.BLOCKS.TYPES.env.params || []).find(p => p.key === key) || {};
+      return ((f.options || []).find(o => o[0] === val) || [null, val || '?'])[1];
+    };
+    const head = envs.map(e => {
+      const p = e.params || {};
+      return `• ${p.name || e.name}${p.base ? ' — БАЗОВОЕ, его значения стоят в параметрах блока' : ''}` +
+        ` · значения из: ${lbl('config_source', p.config_source)}` +
+        ` · данные: ${lbl('data', p.data)}` + (p.purpose ? ` · ${p.purpose}` : '');
+    }).join('\n');
+
+    const defs = (window.BLOCKS.TYPES[n.type] || {}).params || [];
+    const rows = (n.params.env_over || []).filter(r => r && r.env && r.key);
+
+    /* Часть отличий объявлена не здесь, а на узоре — одной строкой на все
+       повторы. Исполнитель узора не читает, поэтому подмешиваем их сюда,
+       помечая источник. Своё у блока перебивает общее: оно точнее. */
+    const pn = String((n.params || {}).pattern || '').trim();
+    const role = String((n.params || {}).pattern_role || '').trim();
+    const own = new Set(rows.map(r => String(r.env).trim() + '|' + String(r.key).trim()));
+    const inherited = [];
+    if (pn && role) {
+      const pnode = window.Graph.state.nodes.find(p => p.type === 'pattern' &&
+        String((p.params || {}).name || '').trim() === pn);
+      for (const r of ((((pnode || {}).params) || {}).env_over || []))
+        if (r && r.env && r.key && String(r.role || '').trim() === role &&
+            !own.has(String(r.env).trim() + '|' + String(r.key).trim()))
+          inherited.push(r);
+    }
+    const line = (r, from) => {
+      const f = defs.find(d => d.key === r.key) || {};
+      const base = n.params[r.key];
+      return `• ${r.env}: ${f.label || r.key} = ${r.value}` +
+        (base === undefined || base === '' ? '' : ` (в базовом ${base})`) +
+        (r.why ? ` — ${r.why}` : '') + from;
+    };
+    const all = rows.map(r => line(r, '')).concat(
+      inherited.map(r => line(r, ` [общее для всех повторов узора «${pn}»]`)));
+    return head + '\nОтличия этого блока:\n' +
+      (all.length ? all.join('\n') : '• в этом блоке значения одинаковы во всех окружениях');
+  }
+
+  /* Повтор узора. Пять одинаковых блоков — это ОДНА задача, построенная пять
+     раз. Без этой секции исполнитель напишет пятую реализацию вместо того,
+     чтобы взять первую: своих соседей по узору он из задания не видит. */
+  function patternText(n) {
+    const pn = String((n.params || {}).pattern || '').trim();
+    if (!pn) return null;
+    const G = window.Graph, B = window.Build;
+    const role = String(n.params.pattern_role || '').trim();
+    const cas = String(n.params.pattern_case || '').trim();
+    const pnode = G.state.nodes.find(p => p.type === 'pattern' &&
+      String((p.params || {}).name || '').trim() === pn);
+    const varies = ((pnode || {}).params || {}).varies || [];
+    const sib = G.state.nodes.filter(s => s.id !== n.id &&
+      String((s.params || {}).pattern || '').trim() === pn &&
+      String((s.params || {}).pattern_role || '').trim() === role);
+
+    const lines = [
+      `Узор «${pn}»${(pnode || {}).params && pnode.params.purpose ? ' — ' + pnode.params.purpose : ''}.`,
+      `Этот блок: роль «${role || '?'}», повтор «${cas || '?'}».`,
+      varies.length ? `Между повторами отличается только: ${varies.join(', ')}.`
+                    : 'Что именно отличается между повторами — у узора не перечислено.',
+    ];
+    if (sib.length) {
+      lines.push('Та же роль в других повторах:');
+      for (const s of sib) {
+        const r = B.get(s.id);
+        lines.push(`• ${s.id} «${s.name}» (повтор «${String((s.params || {}).pattern_case || '').trim() || '?'}») — ` +
+          B.label(r.status) + (r.target.length ? ' · ' + r.target.join(', ') : ''));
+      }
+      lines.push('Строй ОДНИМ переиспользуемым куском, параметризованным по перечисленному выше, а не копией.' +
+        ' Если такой же блок уже готов — бери его код, а не пиши второй.');
+    } else {
+      lines.push('Других повторов этой роли пока нет — но пиши так, чтобы следующий добавлялся параметром, а не копией файла.');
+    }
+    return lines.join('\n');
+  }
+
+  /* Решения, действующие на этот блок. Без них исполнитель видит только «что
+     построить» и совершенно резонно предлагает «а давайте проще» — брокер,
+     поставленный ради развязки, выкидывается как лишний слой. Отменённые и
+     заменённые в задание НЕ идут: они уже ничего не ограничивают. */
+  function decisionText(n) {
+    const live = window.Graph.state.nodes.filter(d => d.type === 'decision' &&
+      ['accepted', 'trial', undefined, ''].includes(d.params.status));
+    if (!live.length) return null;
+    const keys = new Set([n.id]);
+    for (const k of ['unit', 'pattern']) {
+      const v = String((n.params || {})[k] || '').trim(); if (v) keys.add(v);
+    }
+    for (const e of entitiesOf(n)) {
+      const k = String((e.params || {}).key || '').trim(); if (k) keys.add(k);
+    }
+    const mine = live.filter(d => (d.params.affects || []).some(a => keys.has(String(a).trim())));
+    if (!mine.length) return null;
+
+    // многострочное поле в одну строку; хвостовые запятые убираем, иначе «,; »
+    const flat = s => String(s || '').split('\n')
+      .map(x => x.trim().replace(/[;,]+$/, '')).filter(Boolean).join('; ');
+    const body = mine.map(d => {
+      const q = d.params;
+      const rows = [`• ${q.title || d.name} — ${q.status === 'trial' ? 'пробуем' : 'принято'}` +
+        (q.date ? ', ' + q.date : '')];
+      if (flat(q.context)) rows.push(`  что заставило: ${flat(q.context)}`);
+      if (flat(q.rejected)) rows.push(`  отвергнуто: ${flat(q.rejected)}`);
+      if (flat(q.costs)) rows.push(`  чем платим: ${flat(q.costs)}`);
+      if (flat(q.revisit)) rows.push(`  пересмотреть, если: ${flat(q.revisit)}`);
+      return rows.join('\n');
+    }).join('\n');
+    return body + '\nЭто не пожелание: построишь иначе — ты не упростил код, а отменил решение.' +
+      ' Считаешь его неверным — скажи в отчёте, а не обходи молча.';
+  }
+
+  /* Чей это кусок. Блок наследует ответственного от своего контура — своего
+     поля у блока нет. Важно не столько имя, сколько ГРАНИЦА: вход, пришедший
+     из чужого контура, менять нельзя молча, там отвечает не ты. */
+  function ownerText(n) {
+    const G = window.Graph;
+    const own = nm => {
+      const u = nm && G.state.nodes.find(x => x.type === 'unit' &&
+        String((x.params || {}).name || '').trim() === nm);
+      return u ? String((u.params || {}).owner || '').trim() : '';
+    };
+    const my = String((n.params || {}).unit || '').trim();
+    const mine = own(my);
+    const foreign = new Map();
+    for (const e of G.state.edges) {
+      if (e.to.node !== n.id) continue;
+      const src = G.getNode(e.from.node); if (!src) continue;
+      const su = String((src.params || {}).unit || '').trim();
+      if (!su || su === my) continue;
+      const so = own(su);
+      if (so && so !== mine) foreign.set(su, so);
+    }
+    if (!mine && !foreign.size) return null;
+
+    const rows = [my ? `Контур «${my}»${mine ? ` — отвечает: ${mine}` : ' — ответственный не назван'}.`
+                     : 'Блок не приписан ни к одному контуру — ответственного у него нет.'];
+    if (foreign.size) {
+      rows.push('Вход приходит из чужих контуров:');
+      for (const [u, o] of foreign) rows.push(`• ${u} — отвечает: ${o}`);
+      rows.push('Их границу молча не меняй: контракт входа — чужая зона ответственности.' +
+        ' Нужна правка там — скажи в отчёте, а не подгоняй соседа под себя.');
+    }
+    return rows.join('\n');
+  }
+
   function buildOrder(nodeId) {
     const G = window.Graph, B = window.Build, n = G.getNode(nodeId);
     if (!n) return '';
     const T = window.BLOCKS.TYPES[n.type] || {};
     const rec = B.get(nodeId), dr = B.drift(nodeId), rev = B.stamp(nodeId).spec_rev;
+    const dict = dictText(n), env = envText(n), pat = patternText(n), why = decisionText(n);
+    const whose = ownerText(n);
     const mark = id => {
       const s = B.get(id);
       return B.label(s.status) + (s.status !== 'todo' && B.drift(id).stale ? ', ⟳ протух' : '');
@@ -1162,12 +1403,38 @@ window.App = (function () {
       'этим пользуются:',
       outText,
       '',
+      dict ? '## СЛОВАРЬ ДАННЫХ' : null,
+      dict,
+      dict ? 'Это общая форма на всех, кто читает и пишет эти переменные. Не придумывай свою и не переименовывай' +
+             ' поля: расхождение не поймает ни один тест этого блока — оно вскроется на стыке с соседним.' : null,
+      dict ? '' : null,
+      env ? '## ПО ОКРУЖЕНИЯМ' : null,
+      env,
+      env ? 'Отличающиеся значения НЕ зашивай в код — читай из конфигурации окружения (откуда именно, сказано выше).' +
+            ' То, что стоит в параметрах блока, — базовое окружение, а не единственно верное.' : null,
+      env ? '' : null,
+      pat ? '## ПОВТОР УЗОРА' : null,
+      pat,
+      pat ? '' : null,
+      why ? '## ПОЧЕМУ ИМЕННО ТАК' : null,
+      why,
+      why ? '' : null,
+      whose ? '## ЧЕЙ ЭТО КУСОК' : null,
+      whose,
+      whose ? '' : null,
       '## КУДА ПИСАТЬ',
       rec.target.length ? rec.target.map(t => '• ' + t).join('\n')
         : '• не задано — предложи пути и верни их в отчёте полем files',
       '',
       '## ЧЕМ ПРОВЕРИТЬ',
-      rec.checks ? '• ' + rec.checks : '• не задано — предложи команду проверки и верни её в отчёте полем checks',
+      /* Проверки идут списком и с требованием ПРОГНАТЬ их: «готово» без
+         зелёного прогона — это мнение исполнителя, а не факт. */
+      rec.checks
+        ? rec.checks.split('\n').map(s => s.trim()).filter(Boolean)
+            .map((c, i) => `${i + 1}. ${c}`).join('\n') +
+          '\nПрогони их все и верни результат: checks_ok=true, если все зелёные, иначе false' +
+          ' и checks_out с хвостом вывода упавшей.'
+        : '• не задано — предложи команды проверки (по одной в строке), прогони и верни полями checks и checks_ok',
       '',
       dr.stale ? '## ⟳ ПЛАН УШЁЛ ВПЕРЁД\n' + (dr.self ? 'правили сам блок' : '') +
         (dr.deps.length ? (dr.self ? '; ' : '') + 'сменился контракт входа: ' +
@@ -1175,7 +1442,8 @@ window.App = (function () {
         '\nПрежняя работа по этому блоку сделана по старой редакции — сверь её с описанием выше.\n' : null,
       '## КАК ОТЧИТАТЬСЯ',
       'Инструментом MCP конструктора Workbench:',
-      `  report_build(id="${n.id}", status="done"|"failed"|"wip", files=["путь", …], checks="команда", note="что сделал", spec_rev="${rev}")`,
+      `  report_build(id="${n.id}", status="done"|"failed"|"wip", files=["путь", …], checks="команды, по одной в строке",`,
+      `               checks_ok=true|false, checks_out="хвост вывода, если красные", note="что сделал", spec_rev="${rev}")`,
       `spec_rev — печать плана, по которому выдано задание (${rev}). Верни её как есть: по ней конструктор поймёт,`,
       'что план успел уйти вперёд, и пометит блок протухшим, а не готовым.',
       `Задание относится к проекту ${projectId}. Если в конструкторе успели открыть другой проект, отчёт будет`,

@@ -400,8 +400,9 @@ window.Harness = (function () {
       const slot = ((i * 7) % 5 - 2) * 8;
       const obst = rects ? rects.filter(r => r.id !== A.id && r.id !== B.id) : null;
       const d = rounded(route(a, b, slot, obst));
-      const color = def(A.type).color;
-      const cls = `hwire ${e.kind} ${G.isBackEdge(e) ? 'back' : ''} ${sel.has(e.id) ? 'sel' : ''}`;
+      const isErr = e.from.port === 'err';          // аварийный маршрут — красный и в жгуте тоже
+      const color = isErr ? '#f87171' : def(A.type).color;
+      const cls = `hwire ${e.kind} ${isErr ? 'err' : ''} ${G.isBackEdge(e) ? 'back' : ''} ${sel.has(e.id) ? 'sel' : ''}`;
       out.push(`<path class="hwire-hit" data-edge="${e.id}" d="${d}"/>
         <path class="${cls}" data-edge="${e.id}" d="${d}" stroke="${color}"/>
         <circle class="hwire-cap" cx="${b.x.toFixed(1)}" cy="${b.y.toFixed(1)}" r="2.6" fill="${color}"/>`);

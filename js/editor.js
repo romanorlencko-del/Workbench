@@ -126,19 +126,49 @@ window.Editor = (function () {
     return `M${a.x},${a.y} C${c1.toFixed(1)},${cy.toFixed(1)} ${c2.toFixed(1)},${cy.toFixed(1)} ${b.x},${b.y}`;
   }
 
-  function renderEdges() {
+  /* Контуры единиц развёртывания. Рисуем в слое связей, то есть ПОД карточками:
+     это граница и фон, а не объект, который можно взять мышью. Габарит считаем
+     по самим участникам — контур ходит за блоками и не требует отдельной
+     геометрии, которую пришлось бы поддерживать в актуальном состоянии. */
+  const UNIT_PAD = 26;
+  function unitBoxes() {
+    const by = new Map();
+    for (const n of window.Graph.state.nodes) {
+      const u = String((n.params || {}).unit || '').trim();
+      if (!u) continue;
+      if (!by.has(u)) by.set(u, []);
+      by.get(u).push(n);
+    }
     const out = [];
+    for (const [name, list] of by) {
+      const x1 = Math.min(...list.map(n => n.x)) - UNIT_PAD;
+      const y1 = Math.min(...list.map(n => n.y)) - UNIT_PAD;
+      const x2 = Math.max(...list.map(n => n.x + NODE_W)) + UNIT_PAD;
+      const y2 = Math.max(...list.map(n => n.y + nodeHeight(n))) + UNIT_PAD;
+      out.push(`<g class="unit-box">
+        <rect x="${x1.toFixed(1)}" y="${y1.toFixed(1)}" width="${(x2 - x1).toFixed(1)}" height="${(y2 - y1).toFixed(1)}" rx="16"/>
+        <text x="${(x1 + 14).toFixed(1)}" y="${(y1 - 8).toFixed(1)}">${esc(name)}</text>
+      </g>`);
+    }
+    return out;
+  }
+
+  function renderEdges() {
+    const out = unitBoxes();
     const rects = collide ? window.Graph.state.nodes.map(nodeRect) : null;
     for (const e of window.Graph.state.edges) {
       const A = window.Graph.getNode(e.from.node), B = window.Graph.getNode(e.to.node);
       if (!A || !B) continue;
       const a = portPos(A, 'out', e.from.port), b = portPos(B, 'in', e.to.port);
       const back = window.Graph.isBackEdge(e);
-      const color = e.kind === 'data' ? '#2dd4bf' : def(A.type).color;
+      /* Провод ошибки красный независимо от цвета блока: аварийный маршрут
+         должен читаться с одного взгляда, иначе он теряется среди обычных. */
+      const isErr = e.from.port === 'err';
+      const color = isErr ? '#f87171' : (e.kind === 'data' ? '#2dd4bf' : def(A.type).color);
       const d = (collide && !back)
         ? edgePathAvoid(a, b, rects.filter(r => r.id !== A.id && r.id !== B.id))
         : edgePath(a, b, back);
-      const cls = `edge ${e.kind} ${back ? 'back' : ''} ${selection.has(e.id) ? 'sel' : ''}`;
+      const cls = `edge ${e.kind} ${isErr ? 'err' : ''} ${back ? 'back' : ''} ${selection.has(e.id) ? 'sel' : ''}`;
       out.push(`<path class="edge-hit" data-edge="${e.id}" d="${d}"/>
                 <path class="${cls}" data-edge="${e.id}" d="${d}" stroke="${color}"/>${arrow(b, color)}`);
     }
@@ -178,15 +208,27 @@ window.Editor = (function () {
     selection.clear(); onChange('delete'); render(); onSelect([]);
   }
 
+  /* Дублируем не только блоки, но и связи МЕЖДУ ними: копия куска схемы без
+     проводов — это не кусок, а горсть блоков, и перерисовывать их руками ровно
+     та работа, ради которой дублирование и звали. Провода одним концом наружу
+     не тянем: куда их вести, знает только автор. */
   function duplicateSelection() {
-    const copies = [];
+    const map = {};
     for (const id of selection) {
       const n = window.Graph.getNode(id);
       if (!n) continue;
       const c = window.Graph.addNode(n.type, n.x + 28, n.y + 28, JSON.parse(JSON.stringify(n.params)));
-      c.name = n.name; c.notes = n.notes; copies.push(c.id);
+      c.name = n.name; c.notes = n.notes; c.enabled = n.enabled;
+      map[id] = c.id;
     }
-    if (copies.length) { onChange('duplicate'); select(copies); }
+    const copies = Object.keys(map).map(k => map[k]);
+    if (!copies.length) return;
+    for (const e of window.Graph.state.edges.slice()) {
+      if (!map[e.from.node] || !map[e.to.node]) continue;
+      window.Graph.addEdge({ node: map[e.from.node], port: e.from.port },
+                           { node: map[e.to.node], port: e.to.port });
+    }
+    onChange('duplicate'); select(copies);
   }
 
   /* ── вид ────────────────────────────────────────────── */

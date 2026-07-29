@@ -73,7 +73,9 @@ window.Inspector = (function () {
     }).join('') || '<div class="list-empty micro">пусто</div>';
 
     const cur = items[sel];
-    const detail = cur ? (f.item || []).map(sub => {
+    /* Поля записи прячутся по when() так же, как поля блока: у поля-ссылки
+       спрашиваем, на какую сущность, а у остальных восьми видов — нет. */
+    const detail = cur ? (f.item || []).filter(sub => !sub.when || sub.when(cur)).map(sub => {
       const v = cur[sub.key] !== undefined ? cur[sub.key] : '';
       return field(Object.assign({}, sub, { key: `${key}#${sel}#${sub.key}` }), v);
     }).join('') : '<p class="insp-desc">Добавь запись, чтобы настроить её.</p>';
@@ -117,6 +119,18 @@ window.Inspector = (function () {
       </div>`;
   }
 
+  /* «Кто делает» в Стройке и «Кто отвечает» в плане — разные вещи: первое про
+     того, кто пишет код сейчас, второе про того, кто держит кусок системы
+     дальше. Не подставляем одно в другое, только показываем рядом. */
+  function planOwner(node) {
+    const u = String(((node || {}).params || {}).unit || '').trim();
+    if (!u) return '';
+    const unit = window.Graph.state.nodes.find(x => x.type === 'unit' &&
+      String((x.params || {}).name || '').trim() === u);
+    const owner = unit ? String((unit.params || {}).owner || '').trim() : '';
+    return owner ? `<span class="hint micro">за контур «${esc(u)}» в плане отвечает ${esc(owner)}</span>` : '';
+  }
+
   function buildBlock(node) {
     if (!buildMode() || !window.Build) return '';
     const rec = window.Build.get(node.id);
@@ -139,11 +153,18 @@ window.Inspector = (function () {
           placeholder="src/auth/login.py&#10;tests/test_login.py">${esc(rec.target.join('\n'))}</textarea>
         <span class="hint micro">по одному пути в строке — файлы и папки в репозитории</span></div>
       <div class="fld"><label class="lbl" for="build-checks">Чем проверять</label>
-        <input id="build-checks" data-build-key="checks" value="${esc(rec.checks)}" spellcheck="false"
-          placeholder="pytest tests/test_login.py"></div>
+        <textarea id="build-checks" data-build-key="checks" rows="2" spellcheck="false"
+          placeholder="pytest tests/test_login.py&#10;ruff check src/auth">${esc(rec.checks)}</textarea>
+        <span class="hint micro ${rec.checks_ok === false ? 'bad' : rec.checks_ok === true ? 'ok' : ''}">${esc(
+          rec.checks_ok === true ? 'зелёные · ' + tsShort(rec.checks_at)
+          : rec.checks_ok === false ? 'КРАСНЫЕ · ' + tsShort(rec.checks_at)
+          : 'по одной команде в строке · ещё не прогонялись')}</span>
+        ${rec.checks_ok === false && rec.checks_out
+          ? `<pre class="checks-out">${esc(rec.checks_out.slice(-600))}</pre>` : ''}</div>
       <div class="fld"><label class="lbl" for="build-owner">Кто делает</label>
         <input id="build-owner" data-build-key="owner" value="${esc(rec.owner)}" spellcheck="false"
-          placeholder="я · cursor · claude"></div>
+          placeholder="я · cursor · claude">
+        ${planOwner(node)}</div>
       <div class="bops">
         <button class="tb primary" data-act="build-order"
           title="Собрать ТЗ по этому блоку: что построить, что на входе, что обязано получиться">📋 Выдать задание</button>
@@ -269,6 +290,10 @@ window.Inspector = (function () {
     if (!items[idx]) return;
     const f = (parent.item || []).find(p => p.key === sub);
     items[idx][sub] = coerce(f, el);
+
+    // выбор вида записи открывает и закрывает соседние поля — как у блока
+    if (f && (f.type === 'select' || f.type === 'bool') &&
+        (parent.item || []).some(p => p.when)) { renderNode(current); onChange('param'); return; }
 
     // подпись строки в списке обновляем на месте, чтобы не терять фокус
     const row = $body.querySelector(`[data-list-pick="${key}"][data-idx="${idx}"]`);

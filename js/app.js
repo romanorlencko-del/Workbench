@@ -10,17 +10,18 @@ window.App = (function () {
   const LS_PROJECT = 'tester.project.';  // + id → JSON плана проекта
   const LS_CURRENT = 'tester.current';   // id текущего проекта
   const LS_MODELS = 'tester.models';     // ПОДКЛЮЧЕНИЕ ПО УМОЛЧАНИЮ (общее для всех проектов, не в плане)
+  /* состояние стройки живёт в tester.build.<id> — им целиком владеет build.js, план его не видит */
   let chatHistory = [], chatModelRef = 'primary', chatBusy = false;
   let history = [], hp = -1, saveTimer = null, playTimer = null, projectId = null;
-  const diskMtime = {};              // id → mtime последней виденной версии на диске (для newer-wins)
-  const deleted = new Set();         // удалённые в этой сессии id — чтобы запоздавший PUT их не воскресил
-  // экранируем и одинарную кавычку тоже: на будущее, если атрибут соберут в '…'
-  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   /* ── история ────────────────────────────────────────── */
   function snapshot() { return JSON.stringify(window.Graph.toJSON()); }
 
   function commit() {
+    /* План мог поменяться — дрейф пересчитать. Сброс ДО раннего выхода: узел
+       могли подвинуть (снимок тот же), но кеш всё равно чужой не нужен. */
+    window.Build.invalidate();
     const s = snapshot();
     if (history[hp] === s) return;
     history = history.slice(0, hp + 1);
@@ -66,6 +67,8 @@ window.App = (function () {
      Открыто по file:// или движок выключен — молча пропускаем.
      Ключи API сюда НЕ уходят: их нет в плане (в meta.models лишь имя env-переменной). */
   const DISK_ON = location.protocol === 'http:' || location.protocol === 'https:';
+  const diskMtime = {};              // id → mtime последней виденной версии на диске (для newer-wins)
+  const deleted = new Set();         // удалённые в этой сессии id — чтобы запоздавший PUT их не воскресил
   function diskPut(id, planStr) {
     if (!DISK_ON || !id || deleted.has(id)) return;
     try {
@@ -80,14 +83,14 @@ window.App = (function () {
         .catch(() => {});                // движок выключен / оффлайн — не шумим
     } catch (e) {}
   }
-  /* На диске более свежая версия (правили в другой вкладке или файл руками).
+  /* Движок отбил запись: пока мы правили, план изменила другая вкладка или рука.
      По правилу «свежее побеждает» принимаем её, чтобы не потерять уже сохранённое. */
   function reconcileDisk(id, d) {
-    if (!d || !d.plan || !Array.isArray(d.plan.nodes)) return;
+    if (!d || !d.data || !Array.isArray(d.data.nodes)) return;
     if (d.mtime) diskMtime[id] = d.mtime;
-    try { localStorage.setItem(LS_PROJECT + id, JSON.stringify(d.plan)); } catch (e) {}
+    try { localStorage.setItem(LS_PROJECT + id, JSON.stringify(d.data)); } catch (e) {}
     const reg = loadRegistry(), p = reg.find(x => x.id === id);
-    if (p) { p.name = d.plan.name || p.name; p.updatedAt = (d.mtime || 0) * 1000; saveRegistry(reg); }
+    if (p) { p.name = d.data.name || p.name; p.updatedAt = (d.mtime || 0) * 1000; saveRegistry(reg); }
     if (id === projectId) {
       loadProjectState(id);
       toast('Взял более свежую версию проекта с диска (правки из другой вкладки).', 'warn');
@@ -95,6 +98,7 @@ window.App = (function () {
   }
   function diskDelete(id) {
     if (!DISK_ON || !id) return;
+    deleted.add(id);                 // больше не пишем: автосейв в хвосте не должен его воскресить
     try { fetch('api/project/' + encodeURIComponent(id), { method: 'DELETE' }).catch(() => {}); } catch (e) {}
   }
   /* Загрузка: подтянуть планы с диска. Проекта нет в браузере → восстановить;
@@ -118,9 +122,10 @@ window.App = (function () {
     disk.forEach(f => {
       if (!f || !f.id || !f.plan || !Array.isArray(f.plan.nodes)) return;
       if (deleted.has(f.id)) return;                    // удалённый в этой сессии — не воскрешаем
+      diskMtime[f.id] = f.mtime || 0;                   // помним mtime диска — его шлём в X-Prev-Mtime
+      if (f.build) window.Build.hydrate(f.id, f.build, (f.buildMtime || 0) * 1000);   // стройка приезжает своим файлом
       const local = byId.get(f.id);
       const diskMs = (f.mtime || 0) * 1000;
-      diskMtime[f.id] = f.mtime || 0;                   // помним mtime диска — его шлём в X-Prev-Mtime
       try {
         if (!local) {                                     // нет в браузере — восстановить с диска
           localStorage.setItem(LS_PROJECT + f.id, JSON.stringify(f.plan));
@@ -215,7 +220,6 @@ window.App = (function () {
       app.style.setProperty('--console-h', h + 'px');
     });
     hdrag.addEventListener('pointerup', e => { if (!hy) return; hy = 0; try { hdrag.releasePointerCapture(e.pointerId); } catch (_) {} const s = loadLayout(); s.consoleH = parseInt(getComputedStyle(app).getPropertyValue('--console-h'), 10) || undefined; saveLayout(s); });
-    hdrag.addEventListener('pointercancel', e => { hy = 0; try { hdrag.releasePointerCapture(e.pointerId); } catch (_) {} });   // ОС забрала указатель — не залипаем
     hdrag.addEventListener('dblclick', () => { app.style.removeProperty('--console-h'); const s = loadLayout(); delete s.consoleH; saveLayout(s); });
   }
 
@@ -257,22 +261,22 @@ window.App = (function () {
         s.chatH = parseInt(dock.style.getPropertyValue('--chat-h'), 10) || s.chatH;
         saveLayout(s);
       });
-      el.addEventListener('pointercancel', e => { box = null; try { el.releasePointerCapture(e.pointerId); } catch (_) {} });   // ОС забрала указатель — не залипаем
     };
     grab(document.getElementById('cd-w'), 'w');
     grab(document.getElementById('cd-h'), 'h');
     grab(document.getElementById('cd-c'), 'both');
   }
   function loadProjectState(id) {
-    stopPlay();                                  // прогон прежнего проекта не должен тикать по новому
     window.Graph.fromJSON(JSON.parse(localStorage.getItem(LS_PROJECT + id)));
     if (window.Harness) window.Harness.resetManual();
     projectId = id;
+    window.Build.adopt(id);                      // у каждого проекта своя стройка
     localStorage.setItem(LS_CURRENT, id);
     document.getElementById('pipeline-name').value = window.Graph.state.name;
     history = []; hp = -1;
     window.Editor.clearSelection(); commit(); refresh(); window.Editor.fit();
     renderProjectSelect(); adoptProjectChat();
+    bridgePushPlan(true);        // мост обязан узнать о смене проекта сразу, а не через опрос
   }
   /* У каждого проекта свой чат: своя история и своя память о плане. */
   function adoptProjectChat() { chatHistory = loadChat(); renderChatModel(); renderChat(); }
@@ -282,7 +286,6 @@ window.App = (function () {
     try { loadProjectState(id); } catch (e) { toast('Проект не открылся: ' + e.message, 'err'); }
   }
   function createProject(data, name) {
-    stopPlay();                                  // прогон прежнего проекта не должен тикать по новому
     saveNow();                                   // сохранить текущий, потом уйти на новый
     const carry = JSON.parse(JSON.stringify(((window.Graph.state.meta || {}).models) || {}));  // подключение проекта, из которого уходим
     const id = newId();
@@ -290,6 +293,7 @@ window.App = (function () {
     if (name) window.Graph.state.name = name;
     if (window.Harness) window.Harness.resetManual();
     projectId = id;
+    window.Build.adopt(id);                      // новый проект — чистая стройка
     localStorage.setItem(LS_CURRENT, id);
     seedModelsFromGlobal(!!data, carry);         // подключение: дефолт, иначе — из покинутого проекта
     document.getElementById('pipeline-name').value = window.Graph.state.name;
@@ -297,6 +301,7 @@ window.App = (function () {
     window.Editor.clearSelection(); commit(); refresh(); window.Editor.fit();
     touchRegistry(id, window.Graph.state.name || 'Без имени');
     adoptProjectChat();
+    bridgePushPlan(true);        // новый проект — мост тоже должен знать
     return id;
   }
   function duplicateProject() {
@@ -309,10 +314,9 @@ window.App = (function () {
     if (!confirm(`Удалить проект «${window.Graph.state.name}»? Необратимо.`)) return;
     const gone = projectId;
     projectId = null;                            // чтобы автосейв не воскресил удаляемый
-    clearTimeout(saveTimer);                     // отменяем отложенный автосейв удаляемого проекта
-    deleted.add(gone);                           // и запрещаем любой запоздавший PUT по этому id
     try { localStorage.removeItem(LS_PROJECT + gone); localStorage.removeItem(LS_CHAT + '.' + gone); localStorage.removeItem('tester.alias.' + gone); } catch (e) {}
-    diskDelete(gone);                            // и с диска, чтобы удалённый проект не воскрес при загрузке
+    window.Build.drop(gone);                     // стройка удалённого проекта — туда же
+    diskDelete(gone);                            // и с диска, чтобы удалённый проект не воскрес при загрузке (движок снимает и .build.json)
     const rest = list.filter(p => p.id !== gone);
     saveRegistry(rest);
     const next = rest.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0];
@@ -322,9 +326,13 @@ window.App = (function () {
 
   /* ── общий рефреш ───────────────────────────────────── */
   function refresh() {
+    window.Build.invalidate();           // граф мог смениться целиком (undo, импорт, другой проект)
     window.Editor.render();
     window.Inspector.show([...window.Editor.selection]);
     renderConsole();
+    renderBuildCount();
+    renderQueue();
+    renderEnvBox();          // состав плана поменялся — счётчики сред тоже
   }
 
   function onGraphChange() { commit(); refresh(); }
@@ -346,6 +354,95 @@ window.App = (function () {
       </section>`;
     }).join('');
     document.getElementById('palette-list').innerHTML = html || '<div class="qa-empty micro">ничего не найдено</div>';
+  }
+
+  /* ── очередь работ (режим стройки, на месте палитры) ──────
+     Палитра отвечает на «что добавить в план». В стройке вопрос другой — «что
+     брать следующим», и отвечать на него должен сам граф: он знает, кто от кого
+     зависит. Поэтому здесь не список блоков, а фронт работ. */
+
+  /* Что вообще считается работой: заметки ничего не строят, выключенные блоки
+     из конвейера исключены. Фильтр общий со счётчиком — иначе «готово N из M»
+     и очередь спорили бы между собой. */
+  function buildNodeIds() {
+    return window.Graph.state.nodes.filter(n => n.type !== 'note' && n.enabled !== false).map(n => n.id);
+  }
+
+  /* Разложить работу по кучкам. Узел «можно брать», когда он не начат, а все
+     соседи сверху уже готовы и не протухли: строить по неготовому входу — это
+     переделывать дважды. Виток цикла из зависимостей исключён, иначе тело цикла
+     ждало бы само себя. */
+  function queueGroups() {
+    const G = window.Graph, B = window.Build;
+    const ids = buildNodeIds(), work = new Set(ids);
+    const order = {};
+    G.plan().steps.forEach((s, i) => { if (order[s.id] === undefined) order[s.id] = i; });
+    const deps = {};
+    G.state.edges.forEach(e => {
+      if (G.isBackEdge(e) || !work.has(e.to.node) || !work.has(e.from.node)) return;
+      const d = deps[e.to.node] = deps[e.to.node] || [];
+      if (d.indexOf(e.from.node) < 0) d.push(e.from.node);
+    });
+
+    const g = { failed: [], stale: [], ready: [], wip: [], waiting: [], done: 0 };
+    ids.forEach(id => {
+      const st = B.get(id).status, dr = B.drift(id), rec = B.get(id);
+      const why = rec.target.length ? rec.target.join(' · ') : '';
+      if (dr.stale) return g.stale.push({ id, why: dr.self ? 'правили сам блок' : 'сменился контракт входа' });
+      if (st === 'failed') return g.failed.push({ id, why: why || 'нужно разобраться' });
+      if (st === 'wip') return g.wip.push({ id, why: why || (rec.owner ? 'делает ' + rec.owner : '') });
+      if (st === 'done') { g.done++; return; }
+      const block = (deps[id] || []).filter(u => B.get(u).status !== 'done' || B.drift(u).stale);
+      if (block.length) g.waiting.push({ id, why: 'ждёт: ' + block.map(u => (G.getNode(u) || {}).name || u).join(', ') });
+      else g.ready.push({ id, why });
+    });
+    const byPlan = a => a.sort((x, y) =>
+      (order[x.id] === undefined ? 1e9 : order[x.id]) - (order[y.id] === undefined ? 1e9 : order[y.id]));
+    ['failed', 'stale', 'ready', 'wip', 'waiting'].forEach(k => byPlan(g[k]));
+    return g;
+  }
+
+  /* Порядок кучек — по срочности, а не по алфавиту: сломанное и разъехавшееся
+     не должно уезжать под сотню готовых к работе. */
+  const QUEUE_GROUPS = [
+    ['failed',  'Провалено',   'нужно разобраться'],
+    ['stale',   'Протухло',    'план ушёл вперёд'],
+    ['ready',   'Можно брать', 'входы готовы'],
+    ['wip',     'В работе',    'уже взято'],
+    ['waiting', 'Ждёт',        'входы ещё не готовы'],
+  ];
+
+  let queueFilter = '';
+
+  function renderQueue() {
+    const el = document.getElementById('queue-list'); if (!el) return;
+    const g = queueGroups();
+    const f = queueFilter.trim().toLowerCase();
+    const total = buildNodeIds().length;
+
+    const html = QUEUE_GROUPS.map(([key, label, hint]) => {
+      const all = g[key];
+      const items = f ? all.filter(it => ((window.Graph.getNode(it.id) || {}).name || '').toLowerCase().includes(f)) : all;
+      if (!items.length) return '';
+      return `<section class="q-group ${key}">
+        <div class="q-head"><span class="micro">${esc(label)}</span>
+          <span class="q-count">${items.length}${f && items.length !== all.length ? ' из ' + all.length : ''}</span>
+          <span class="pal-hint">${esc(hint)}</span></div>
+        ${items.map(it => {
+          const n = window.Graph.getNode(it.id); if (!n) return '';
+          const d = window.BLOCKS.TYPES[n.type];
+          return `<button class="q-row" data-node="${it.id}" style="--c:${d.color}" title="${esc(d.label)}">
+            <span class="q-icon">${esc(d.icon)}</span>
+            <span class="q-txt"><b>${esc(n.name)}</b>${it.why ? `<i>${esc(it.why)}</i>` : ''}</span>
+          </button>`;
+        }).join('')}
+      </section>`;
+    }).join('');
+
+    el.innerHTML = html || `<div class="q-empty micro">${
+      !total ? 'В плане ещё нет блоков — очередь возьмётся оттуда.'
+      : f ? 'По запросу ничего не нашлось.'
+      : 'Всё построено и ничего не протухло — фронт работ пуст.'}</div>`;
   }
 
   /* ── консоль ────────────────────────────────────────── */
@@ -488,11 +585,96 @@ window.App = (function () {
     if (ids && ids.length) openInspector(); else closeInspector();
   }
 
+  /* ── режим работы: план / стройка ─────────────────────
+     Ортогонален виду: холст и жгут работают в обоих режимах. Режим — не про
+     картинку, а про то, с каким слоем данных мы сейчас имеем дело: замысел
+     (nodes/edges плана) или стройка (что из него уже построено в коде). */
+  function getMode() { return loadLayout().mode === 'build' ? 'build' : 'plan'; }
+
+  /* «Готово N из M» — считаем только по узлам, которые сейчас есть в плане:
+     записи от удалённых блоков не должны надувать знаменатель. N — готовые И не
+     протухшие, поэтому число падает, когда правишь план: это и есть сигнал. */
+  function renderBuildCount() {
+    const el = document.getElementById('buildcount'); if (!el) return;
+    const c = window.Build.counts(buildNodeIds());
+    const pct = c.total ? Math.round(c.ready / c.total * 100) : 0;
+    el.style.setProperty('--p', pct);
+    el.innerHTML = `<b>${c.ready}</b><span class="bc-of">из ${c.total}</span>` +
+      (c.wip ? `<span class="bc-wip" title="в работе">${c.wip}</span>` : '') +
+      (c.stale ? `<span class="bc-stale" title="протухло: план изменился после отметки">${c.stale}</span>` : '') +
+      (c.failed ? `<span class="bc-failed" title="провалено">${c.failed}</span>` : '');
+    el.title = `Готово ${c.ready} из ${c.total} · в работе ${c.wip} · протухло ${c.stale} · провалено ${c.failed}`;
+  }
+  function applyMode(mode) {
+    const m = mode === 'build' ? 'build' : 'plan';
+    document.getElementById('app').classList.toggle('mode-build', m === 'build');
+    document.querySelectorAll('.msw').forEach(b => b.classList.toggle('on', b.dataset.act === 'mode-' + m));
+    window.Inspector.show([...window.Editor.selection]);   // правая панель показывает свой слой
+    /* поиск слева обслуживает то, что сейчас в левой панели; фильтр от прошлого
+       режима сбрасываем — иначе список молча приезжает урезанным */
+    const $s = document.getElementById('palette-search');
+    if ($s) { $s.value = ''; $s.placeholder = m === 'build' ? 'поиск по очереди…' : 'поиск…'; }
+    queueFilter = '';
+    renderPalette('');
+    renderBuildCount();
+    renderQueue();
+    return m;
+  }
+  function setMode(mode) {
+    const m = applyMode(mode);
+    const s = loadLayout(); s.mode = m; saveLayout(s);
+    toast(m === 'build' ? 'Режим стройки: отмечаем, что уже построено' : 'Режим плана: правим схему', 'ok');
+  }
+
   /* ── вид холста: свободный / жгут ───────────────────── */
   function setView(mode) {
     window.Editor.setViewMode(mode);
     const m = window.Editor.getViewMode();
     document.querySelectorAll('.vsw').forEach(b => b.classList.toggle('on', b.dataset.act === 'view-' + m));
+    syncDetailBtn(m);
+    renderEnvBox();
+  }
+
+  /* Плотность жгута: подробные карточки (грамматика плаката) против обзорных
+     чипов. Кнопка живёт только в жгуте — на свободном холсте ей нечем править. */
+  function syncDetailBtn(view) {
+    const b = document.getElementById('hdetail'); if (!b) return;
+    const on = window.Harness.getDetail();
+    b.hidden = (view || window.Editor.getViewMode()) !== 'harness';
+    b.classList.toggle('on', on);
+    b.textContent = on ? '▤' : '▭';
+    b.title = on ? 'Жгут: подробные карточки — переключить на плотные чипы'
+                 : 'Жгут: плотные чипы — переключить на подробные карточки';
+  }
+  function toggleDetail() {
+    const on = !window.Harness.getDetail();
+    window.Harness.setDetail(on);
+    const s = loadLayout(); s.hDetail = on; saveLayout(s);
+    syncDetailBtn();
+    window.Editor.render(); window.Editor.fit();
+    toast(on ? 'Жгут: подробные карточки' : 'Жгут: плотные чипы', 'ok');
+  }
+
+  /* ── подсветка сред (жгут) ────────────────────────────
+     Среда — свойство узла, а не место в раскладке: клиентские экраны и точки
+     эгресса разбросаны по всему потоку. Искать их глазами по схеме в десять
+     тысяч точек нельзя, поэтому среду включают тумблером. Живёт в HUD, а не в
+     легенде: легенда внутри холста и вместе с ним уезжает в 10% зума. */
+  function renderEnvBox() {
+    const el = document.getElementById('envbox'); if (!el) return;
+    const H = window.Harness, show = H.getEnvShow(), n = H.envCounts();
+    el.innerHTML = '<span class="envbox-t">среда</span>' + H.ENVS.map(e =>
+      `<button class="env-sw ${e} ${show[e] ? 'on' : ''}" data-env="${e}" ${n[e] ? '' : 'disabled'}
+        title="${n[e] ? 'Подсветить ' + esc(H.envLabel(e)).toLowerCase() : 'В этом плане таких блоков нет'}"
+        style="--zc:${H.envColor(e)}">${esc(H.envLabel(e))}<b>${n[e]}</b></button>`).join('');
+    el.hidden = window.Editor.getViewMode() !== 'harness';
+  }
+  function toggleEnv(env) {
+    const H = window.Harness, show = H.getEnvShow();
+    H.setEnvShow(env, !show[env]);
+    const s = loadLayout(); s.hEnv = H.getEnvShow(); saveLayout(s);
+    renderEnvBox();
+    window.Editor.render();          // только перекраска: раскладка не менялась
   }
 
   function switchTab(tab) {
@@ -521,15 +703,82 @@ window.App = (function () {
      опрашивает (/bridge/pull) и применяет ТЕМ ЖЕ кодом, что и правки из чата
      (applyOpsFromChat). Текущий план шлём обратно (/bridge/plan), чтобы
      приложение видело актуальную карту. URL движка берём из настроек прокси. */
-  let bridgeTimer = null, bridgeLastRev = -1, bridgeBusy = false;
+  let bridgeTimer = null, bridgeLastKey = '', bridgeBusy = false;
   function bridgeBase() { const p = loadProxy(); return p && p.url ? String(p.url).trim().replace(/\/+$/, '') : ''; }
-  function bridgePushPlan(force) {
-    const base = bridgeBase(); if (!base) return;
-    const rev = (window.Graph.state.meta && Number(window.Graph.state.meta.rev)) || 0;
-    if (!force && rev === bridgeLastRev) return;
-    bridgeLastRev = rev;
-    fetch(base + '/bridge/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(window.Graph.toJSON()) }).catch(() => {});
+  /* Кто мы для моста. Проектов несколько, а id блоков в них совпадают (agent_3
+     есть почти везде) — без подписи операция из приложения молча ляжет не в тот
+     план. Подпись едет в КАЖДОМ сообщении. */
+  function bridgeWho() {
+    const s = window.Graph.state;
+    return { id: projectId, name: s.name || 'Без имени', rev: (s.meta && Number(s.meta.rev)) || 0 };
   }
+  function bridgePushPlan(force) {
+    const base = bridgeBase(); if (!base || !projectId || !loadProxy().bridge) return;
+    const who = bridgeWho();
+    /* Ключ по ПРОЕКТУ и rev: у разных проектов rev легко совпадает, и по одному
+       номеру переключение проекта осталось бы незамеченным. */
+    const key = who.id + ':' + who.rev;
+    if (!force && key === bridgeLastKey) return;
+    bridgeLastKey = key;
+    fetch(base + '/bridge/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project: who, plan: window.Graph.toJSON() }) }).catch(() => {});
+  }
+  /* Доска заданий: браузер кладёт выданное задание, приложение забирает его
+     инструментом get_task. Отчёт снимает задание с доски — иначе исполнитель
+     будет вечно видеть уже закрытую работу. */
+  function bridgePushTask(id, name, text) {
+    const base = bridgeBase(); if (!base || !loadProxy().bridge) return false;
+    bridgePushPlan(true);          // сперва представиться: мост должен знать, чей это проект
+    fetch(base + '/bridge/task', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, node: name, project: bridgeWho(), text }) }).catch(() => {});
+    return true;
+  }
+  function bridgeTaskDone(id) {
+    const base = bridgeBase(); if (!base || !loadProxy().bridge) return;
+    fetch(base + '/bridge/task', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, done: true, project: bridgeWho() }) }).catch(() => {});
+  }
+
+  /* Последняя линия защиты: движок уже отбил чужие операции, но вкладок может
+     быть две, а очередь могла набраться до переключения проекта. Неподписанное
+     тоже не берём — движок штампует всё, что через него проходит, значит
+     подписи нет только у мусора. Молчать нельзя: человек должен понять, почему
+     приложение «сделало», а в схеме ничего не изменилось. */
+  let bridgeToldAt = 0;
+  function bridgeMine(item) {
+    const p = item && item.project;
+    const id = p && typeof p === 'object' ? p.id : p;
+    if (id && String(id) === String(projectId)) return true;
+    const now = Date.now();
+    if (now - bridgeToldAt > 8000) {                    // не сыпать тостами на каждый опрос
+      bridgeToldAt = now;
+      toast(id ? `Мост: пришло для другого проекта (${String(id).slice(0, 12)}) — не применяю`
+               : 'Мост: сообщение без проекта — не применяю', 'warn');
+    }
+    return false;
+  }
+
+  /* Отчёт о стройке едет тем же мостом, что и правки плана, но В ПЛАН НЕ ИДЁТ:
+     {"build":[{"id":"agent_3","status":"done","files":[…],"checks":"…","note":"…","spec_rev":"…"}]} */
+  function extractBuild(item) {
+    if (!item || typeof item !== 'object' || Array.isArray(item) || !Array.isArray(item.build)) return null;
+    const list = item.build.filter(r => r && r.id);
+    return list.length ? list : null;
+  }
+  function applyBuildReports(list) {
+    const ok = [];
+    list.forEach(r => {
+      const id = resolveNodeId(String(r.id));
+      if (!id) return void toast(`Отчёт мимо: блока «${r.id}» нет в плане`, 'warn');
+      window.Build.report(id, r);
+      bridgeTaskDone(id);
+      ok.push((window.Graph.getNode(id) || {}).name || id);
+    });
+    if (!ok.length) return;
+    window.Inspector.show([...window.Editor.selection]);   // открытая карточка должна показать новое состояние
+    toast(`Отчёт принят: ${ok.join(', ')}`, 'ok');
+  }
+
   async function bridgePoll() {
     if (bridgeBusy) return;
     const base = bridgeBase(); if (!base) return;
@@ -540,7 +789,13 @@ window.App = (function () {
         const data = await r.json();
         const items = (data && data.ops) || [];
         let applied = 0;
-        items.forEach(it => { const ops = extractOps(JSON.stringify(it)); if (ops) { applyOpsFromChat(ops, { silent: true }); applied++; } });
+        items.forEach(it => {
+          if (!bridgeMine(it)) return;                     // чужой проект — не наше дело
+          const rep = extractBuild(it);
+          if (rep) return applyBuildReports(rep);          // это стройка, а не замысел — план не трогаем
+          const ops = extractOps(JSON.stringify(it));
+          if (ops) { applyOpsFromChat(ops, { silent: true }); applied++; }
+        });
         bridgePushPlan(!!applied);   // после правок — точно перешлём план; иначе только если сменился rev
       }
     } catch (e) { /* движок не поднят — тихо ждём */ }
@@ -693,8 +948,8 @@ window.App = (function () {
         <input id="proxy-url" type="text" value="${esc(px.url || 'http://localhost:8792')}" placeholder="http://localhost:8792"></div>
       <div class="micro dim">Запусти прокси: <code>py chat_proxy.py</code> (или в WSL рядом с движком). Ключ идёт браузер→localhost→провайдер.</div></div>`;
     const bridgeBlock = `<div class="gmodel"><div class="gmodel-h">Сопряжение с приложениями (MCP) · Cursor / Claude Desktop / Antigravity</div>
-      <label class="gproxy-on"><input type="checkbox" id="bridge-on" ${px.bridge ? 'checked' : ''}> принимать команды из приложений и строить план вживую</label>
-      <div class="micro dim">Приложение шлёт правки на движок, конструктор применяет их сам. Статус: <b id="bridge-state" class="${px.bridge ? 'on' : ''}">${px.bridge ? 'включено' : 'выключено'}</b>. Нужен запущенный движок (<code>py serve.py</code>).</div>
+      <label class="gproxy-on"><input type="checkbox" id="bridge-on" ${px.bridge ? 'checked' : ''}> принимать команды из приложений: правки плана и отчёты о стройке</label>
+      <div class="micro dim">Приложение шлёт правки на движок, конструктор применяет их сам. В обратную сторону: «Выдать задание» на блоке (режим стройки) кладёт ТЗ на доску — приложение забирает его инструментом <code>get_task</code>, а сделанное возвращает через <code>report_build</code>. Статус: <b id="bridge-state" class="${px.bridge ? 'on' : ''}">${px.bridge ? 'включено' : 'выключено'}</b>. Нужен запущенный движок (<code>py serve.py</code>).</div>
       <div class="mcp-files">
         <div class="mcp-file"><span class="mcp-file-ico">🐍</span>
           <div class="mcp-file-body"><b>mcp_server.py</b><i>сам MCP-сервер — его запускает приложение</i></div>
@@ -834,6 +1089,114 @@ window.App = (function () {
     document.body.appendChild(ta); ta.select();
     try { document.execCommand('copy'); done(); } catch (e) { toast('Не удалось скопировать — выдели вручную', 'err'); }
     ta.remove();
+  }
+
+  /* ── задание на один блок (режим стройки) ─────────────────────
+     Бриф отдаёт ВЕСЬ план — он про доработку замысла. Задание отдаёт СРЕЗ вокруг
+     одного блока: что построить, что придёт на вход, что обязано получиться на
+     выходе. Исполнителю не нужен весь граф — ему нужны его границы, иначе он
+     переделает соседей «заодно» и разъедется с планом. */
+
+  /* Объявленный наружу контракт блока: то, на что опираются те, кто ниже. Ровно
+     то же, чем меряется дрейф, — иначе задание обещало бы одно, а протухание
+     считалось бы по другому. */
+  function contractText(n) {
+    const out = [];
+    ['output_var', 'format', 'fields', 'schema'].forEach(k => {
+      const v = n.params[k];
+      if (v !== undefined && v !== '' && !(Array.isArray(v) && !v.length))
+        out.push(`${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`);
+    });
+    ((window.BLOCKS.TYPES[n.type] || {}).params || []).forEach(f => {
+      if (f.type !== 'list') return;
+      const vars = (n.params[f.key] || []).map(it => it.output_var).filter(Boolean);
+      if (vars.length) out.push(`${f.key}: ${vars.length} записей → ${vars.join(', ')}`);
+    });
+    (window.BLOCKS.portsOf(n, 'out') || []).forEach(p => out.push(`порт ${p.id} (${p.kind}) — ${p.label}`));
+    return out.length ? out.map(s => '  ' + s).join('\n') : '  — наружу ничего не объявлено';
+  }
+
+  function buildOrder(nodeId) {
+    const G = window.Graph, B = window.Build, n = G.getNode(nodeId);
+    if (!n) return '';
+    const T = window.BLOCKS.TYPES[n.type] || {};
+    const rec = B.get(nodeId), dr = B.drift(nodeId), rev = B.stamp(nodeId).spec_rev;
+    const mark = id => {
+      const s = B.get(id);
+      return B.label(s.status) + (s.status !== 'todo' && B.drift(id).stale ? ', ⟳ протух' : '');
+    };
+    const ins = G.state.edges.filter(e => e.to.node === nodeId);
+    const outs = G.state.edges.filter(e => e.from.node === nodeId);
+
+    const inText = ins.length ? ins.map(e => {
+      const u = G.getNode(e.from.node); if (!u) return '';
+      return `• ${u.id} · ${u.type} · «${u.name}» → мой вход «${e.to.port}» (${e.kind === 'data' ? 'знания' : 'поток'})\n` +
+             `  стройка: ${mark(u.id)}\n  отдаёт:\n${contractText(u).split('\n').map(s => '  ' + s).join('\n')}`;
+    }).filter(Boolean).join('\n') : '• входов нет — это точка входа, данные берёт сам';
+    const notReady = ins.map(e => e.from.node).filter(id => B.get(id).status !== 'done')
+      .map(id => (G.getNode(id) || {}).name).filter(Boolean);
+
+    const outText = outs.length
+      ? outs.map(e => { const d = G.getNode(e.to.node); return d ? `• ${d.id} · «${d.name}» ← мой выход «${e.from.port}»` : ''; }).filter(Boolean).join('\n')
+      : '• никто — это конец ветки';
+
+    return [
+      `# ЗАДАНИЕ · проект «${G.state.name}» (${projectId}) · блок ${n.id}`,
+      'Ты пишешь код по плану из конструктора Workbench. Строим ОДИН блок — соседей не трогаем:',
+      'их границы описаны ниже как контракты, и менять их без правки плана нельзя.',
+      '',
+      '## ЧТО ПОСТРОИТЬ',
+      `${n.id} · тип ${n.type} (${T.label || '?'})${n.enabled === false ? ' · ВЫКЛЮЧЕН В ПЛАНЕ' : ''}`,
+      `имя: ${n.name}`,
+      `назначение типа: ${T.desc || '—'}`,
+      `заметка автора плана: ${n.notes || '—'}`,
+      'параметры блока — это ТЗ шага, а не примеры:',
+      JSON.stringify(n.params || {}, null, 1),
+      '',
+      '## ЧТО ПРИХОДИТ НА ВХОД',
+      inText,
+      notReady.length ? `⚠ ещё не построено: ${notReady.join(', ')} — на эти входы полагайся по контракту, а не по коду.` : null,
+      '',
+      '## ЧТО ОБЯЗАНО ПОЛУЧИТЬСЯ НА ВЫХОДЕ',
+      contractText(n),
+      'этим пользуются:',
+      outText,
+      '',
+      '## КУДА ПИСАТЬ',
+      rec.target.length ? rec.target.map(t => '• ' + t).join('\n')
+        : '• не задано — предложи пути и верни их в отчёте полем files',
+      '',
+      '## ЧЕМ ПРОВЕРИТЬ',
+      rec.checks ? '• ' + rec.checks : '• не задано — предложи команду проверки и верни её в отчёте полем checks',
+      '',
+      dr.stale ? '## ⟳ ПЛАН УШЁЛ ВПЕРЁД\n' + (dr.self ? 'правили сам блок' : '') +
+        (dr.deps.length ? (dr.self ? '; ' : '') + 'сменился контракт входа: ' +
+          dr.deps.map(id => '«' + ((G.getNode(id) || {}).name || id) + '»').join(', ') : '') +
+        '\nПрежняя работа по этому блоку сделана по старой редакции — сверь её с описанием выше.\n' : null,
+      '## КАК ОТЧИТАТЬСЯ',
+      'Инструментом MCP конструктора Workbench:',
+      `  report_build(id="${n.id}", status="done"|"failed"|"wip", files=["путь", …], checks="команда", note="что сделал", spec_rev="${rev}")`,
+      `spec_rev — печать плана, по которому выдано задание (${rev}). Верни её как есть: по ней конструктор поймёт,`,
+      'что план успел уйти вперёд, и пометит блок протухшим, а не готовым.',
+      `Задание относится к проекту ${projectId}. Если в конструкторе успели открыть другой проект, отчёт будет`,
+      'отбит — это защита: id блоков в разных проектах совпадают, и отчёт лёг бы не в ту схему.',
+      'MCP не подключён — скажи человеку словами, он отметит в конструкторе руками.',
+    ].filter(s => s !== null).join('\n');   // '' — это пустая строка-разделитель, её не выкидываем
+  }
+
+  /* Выдать задание: текст в буфер И на доску движка, откуда его заберёт
+     приложение. Одновременно узел переходит «в работе» и запоминает печать
+     плана: правку после выдачи мы увидим как дрейф ещё до отчёта. */
+  function issueOrder(nodeId) {
+    const id = nodeId || (window.Inspector.current && window.Inspector.current.id);
+    const n = id && window.Graph.getNode(id);
+    if (!n) return;
+    const text = buildOrder(id);
+    window.Build.issue(id);
+    const posted = bridgePushTask(id, n.name, text);
+    copyText(text, posted ? `Задание «${n.name}» скопировано и отдано приложению`
+                          : `Задание «${n.name}» скопировано — вставь в Cursor/Claude`);
+    window.Inspector.show([...window.Editor.selection]);
   }
 
   /* ── проект как КОМПАКТНАЯ память чата ────────────────────────
@@ -1119,7 +1482,7 @@ window.App = (function () {
      ИИ зовёт блоки как ему удобнее, и из-за буквоедства связи молча терялись. */
   const normName = s => String(s || '').toLowerCase()
     .replace(/[«»"'`.,:;!?()\[\]{}—–_-]/g, ' ').replace(/\s+/g, ' ').trim();
-  function resolveNodeId(id, strict) {
+  function resolveNodeId(id) {
     if (!id) return null;
     if (nodeById(id)) return id;
     const a = loadAliases()[id];
@@ -1129,17 +1492,14 @@ window.App = (function () {
     const nodes = window.Graph.state.nodes;
     const exact = nodes.find(n => normName(n.name) === q);
     if (exact) return exact.id;
-    // тихое применение (мост из приложений, без диалога) — только точное совпадение:
-    // нечёткий префикс мог молча изменить/удалить НЕ тот блок
-    if (strict) return null;
     const starts = nodes.filter(n => normName(n.name).startsWith(q) || q.startsWith(normName(n.name)));
     return starts.length === 1 ? starts[0].id : null;
   }
 
-  function splitOps(ops, strict) {
+  function splitOps(ops) {
     const create = ops.add.slice(), update = [], unknown = [];
     ops.patch.forEach(p => {
-      const real = resolveNodeId(p.id, strict);
+      const real = resolveNodeId(p.id);
       if (real) update.push(Object.assign({}, p, { id: real }));
       else if (p.type) create.push(p);
       else unknown.push(p.id);
@@ -1390,7 +1750,7 @@ window.App = (function () {
 
   function applyOpsFromChat(ops, opts) {
     const silent = !!(opts && opts.silent);   // мост из приложений применяет без диалога
-    const { create, update, unknown } = splitOps(ops, silent);
+    const { create, update, unknown } = splitOps(ops);
     if (!create.length && !update.length && !ops.edges.length && !ops.del.length && !ops.layout) {
       if (silent) return;
       // молча отказать мало: скажем и человеку, и модели, каких именно блоков нет
@@ -1419,7 +1779,7 @@ window.App = (function () {
     update.forEach(p => fieldsInto(nodeById(p.id), p));
     unknown.forEach(id => warn.push(`блок «${id}» не найден (для нового нужен "type")`));
 
-    const rid = id => alias[id] || resolveNodeId(id, silent);
+    const rid = id => alias[id] || resolveNodeId(id);
     let nEdges = 0;
     ops.edges.forEach(e => {
       const a = parseEndpoint(Array.isArray(e) ? e[0] : e && e.from);
@@ -1492,14 +1852,10 @@ window.App = (function () {
   /* ── старт ──────────────────────────────────────────── */
   async function init() {
     window.Editor.init({ onChange: onGraphChange, onSelect: onSelectIds });
-    window.Inspector.init({ onChange: (reason, live) => {
-      if (live) {
-        // живой ввод: обновляем вид и мягко автосейвим, но НЕ трогаем связи и НЕ пишем в историю —
-        // иначе правка порт-задающего поля посимвольно роняла связи, а undo-история вымывалась
-        window.Editor.render(); renderConsole(); autosave();
-        return;
-      }
-      window.Graph.pruneEdges();          // завершённая правка: порт мог исчезнуть (select/bool, blur)
+    /* стройка изменилась — перекрасить схему и пересчитать счётчик (план не трогаем) */
+    window.Build.onChange(() => { window.Editor.render(); renderBuildCount(); renderQueue(); });
+    window.Inspector.init({ onChange: () => {
+      window.Graph.pruneEdges();          // порты могли исчезнуть после правки параметров
       commit(); window.Editor.render(); renderConsole();
     } });
 
@@ -1527,6 +1883,7 @@ window.App = (function () {
               : registry.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0].id;
     try { window.Graph.fromJSON(JSON.parse(localStorage.getItem(LS_PROJECT + projectId))); }
     catch (e) { window.Graph.fromJSON(window.PIPELINE); }
+    window.Build.adopt(projectId);         // стройка текущего проекта — после подхвата с диска
     document.getElementById('pipeline-name').value = window.Graph.state.name;
 
     renderPalette('');
@@ -1554,7 +1911,18 @@ window.App = (function () {
       e.dataTransfer.setData('text/block', it.dataset.type);
       e.dataTransfer.effectAllowed = 'copy';
     });
-    document.getElementById('palette-search').addEventListener('input', e => renderPalette(e.target.value));
+    document.getElementById('palette-search').addEventListener('input', e => {
+      if (getMode() === 'build') { queueFilter = e.target.value; renderQueue(); }
+      else renderPalette(e.target.value);
+    });
+
+    /* строка очереди — прыжок к блоку: искать его глазами по холсту незачем */
+    document.getElementById('queue-list').addEventListener('click', e => {
+      const row = e.target.closest('.q-row'); if (!row) return;
+      window.Editor.select(row.dataset.node);
+      window.Editor.centerOn(row.dataset.node);
+      closePalette();                     // на узком экране очередь — модальная шторка
+    });
     const loadPreset = src => {
       createProject(JSON.parse(JSON.stringify(src)), src.name);
       toast('Загружено как новый проект: ' + window.Graph.state.name, 'ok');
@@ -1571,7 +1939,9 @@ window.App = (function () {
       if (act === 'export') exportJSON();
       if (act === 'undo') undo();
       if (act === 'redo') redo();
+      if (act === 'mode-plan' || act === 'mode-build') return setMode(act === 'mode-build' ? 'build' : 'plan');
       if (act === 'view-graph' || act === 'view-harness') return setView(act === 'view-harness' ? 'harness' : 'graph');
+      if (act === 'hdetail') return toggleDetail();
       if (act === 'layout') {
         if (window.Editor.getViewMode() === 'harness') return toast('Жгут раскладывается сам — переключись на холст', 'warn');
         window.Editor.autoLayout(); onGraphChange(); window.Editor.fit(); toast('Схема разложена по слоям', 'ok');
@@ -1600,6 +1970,8 @@ window.App = (function () {
 
     /* холст-хад */
     document.querySelector('.stage-hud').addEventListener('click', e => {
+      const env = e.target.closest('[data-env]');
+      if (env) return toggleEnv(env.dataset.env);
       const b = e.target.closest('[data-act]'); if (!b) return;
       const r = document.getElementById('stage').getBoundingClientRect();
       const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
@@ -1643,6 +2015,11 @@ window.App = (function () {
 
     setupConsoleResize();
     setupChatDock();
+    applyMode(loadLayout().mode);          // режим переживает перезагрузку
+    window.Harness.setDetail(loadLayout().hDetail !== false);   // плотность жгута — тоже
+    const env = loadLayout().hEnv;
+    if (env) window.Harness.ENVS.forEach(e => { if (e in env) window.Harness.setEnvShow(e, env[e]); });
+    syncDetailBtn(); renderEnvBox();
     applyPalMin(loadLayout().palMin);
     applyInspMin(loadLayout().inspMin);
     applyBridgeState();   // возобновить сопряжение с приложениями, если было включено
@@ -1709,13 +2086,16 @@ window.App = (function () {
       if (e.key === 'h' || e.key === 'H' || e.key === 'р' || e.key === 'Р') {
         return setView(window.Editor.getViewMode() === 'harness' ? 'graph' : 'harness');
       }
+      if (e.key === 'm' || e.key === 'M' || e.key === 'ь' || e.key === 'Ь') {
+        return setMode(getMode() === 'build' ? 'plan' : 'build');
+      }
       if (e.key === 'Escape') { closeGuide(); window.Editor.clearSelection(); stopPlay(); }
     });
 
     window.addEventListener('beforeunload', saveNow);
   }
 
-  return { init, toast, commit, refresh, exportJSON };
+  return { init, toast, commit, refresh, exportJSON, issueOrder };
 })();
 
 /* скрипты грузятся динамически, DOMContentLoaded мог уже пройти */

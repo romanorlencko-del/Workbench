@@ -6,9 +6,23 @@
 window.Harness = (function () {
 
   const CHIP_W = 132, CHIP_MIN_H = 38, PIN_STEP = 11, PIN_PAD = 13;
-  const SLOTS_MAX = 1;                 // чипов в ряд внутри одной колонки шины
+  /* Сколько чипов кладём в ряд внутри ячейки «колонка × шина». Пока их немного —
+     столбик, читается как порядок. Но пачка сиблингов (два десятка экспертов в
+     одной колонке) в столбик растягивает ПОЛОСУ ЦЕЛИКОМ — и остальные колонки
+     той же шины оказываются в поле пустоты. Такую пачку кладём решёткой. */
+  const SLOT_CAP = 4, SLOT_ROWS = 4;
+  const slotsFor = k => Math.min(SLOT_CAP, Math.max(1, Math.ceil(k / SLOT_ROWS)));
   const GAP_X = 18, GAP_Y = 9, COL_GAP = 48, LANE = 92;
   const X0 = 70, Y0 = 64, STUB = 16, BACK_GAP = 34;
+
+  /* Подробная карточка — грамматика архитектурного плаката: ИМЯ · КЛАСС · ТАКТ ·
+     ФАКТЫ. Такт (тайминги, повторы, режим) вынесен отдельной строкой и своим
+     цветом: схема должна отвечать не только «кто с кем», но и «как часто».
+     Плотный чип остаётся для обзора большой схемы — переключателем. */
+  const CARD_W = 252, CARD_PAD = 10, ROW_NAME = 18, ROW_SUB = 15, ROW_FACT = 14;
+  const FACT_LINES = 2, HEAD_H = 32;
+  let detail = true;
+  const chipW = () => detail ? CARD_W : CHIP_W;
 
   /* Цвет шины — по категории, независимо от цветов отдельных блоков. */
   const BUS_COLOR = { flow: '#f5a524', work: '#a78bfa', data: '#2dd4bf', io: '#4ade80' };
@@ -25,9 +39,89 @@ window.Harness = (function () {
   const def = t => window.BLOCKS.TYPES[t] || { color: '#5d6a80', icon: '·', label: t };
   const ports = (n, dir) => window.BLOCKS.portsOf(n, dir);
 
+  /* ── содержимое карточки ────────────────────────────────
+     Порядок строк один на все типы: сколько бы ни было параметров, глаз ищет
+     их всегда в одном месте. Пустые строки просто не рисуются. */
+
+  /* Такт — как часто и в каком режиме работает узел. Ключи перечислены явно:
+     из 146 параметров модели про режим работы говорят вот эти, остальное —
+     содержание шага, ему место в фактах. */
+  const TACT = [
+    ['schedule',       v => 'по расписанию: ' + v],
+    ['interval_s',     v => 'каждые ' + v + ' с'],
+    ['interval_min',   v => 'каждые ' + v + ' мин'],
+    ['trigger',        v => 'запуск: ' + v],
+    ['mode',           v => v],
+    ['runtime',        v => v],
+    ['model_ref',      v => 'модель: ' + v],
+    ['timeout_s',      v => '⏱ ' + v + ' с'],
+    ['max_iterations', v => '↺ до ' + v],
+    ['rate_limit',     v => '≤ ' + v + '/с'],
+    ['batch',          v => 'пачка ' + v],
+    ['limit',          v => 'до ' + v],
+    ['cache_ttl_s',    v => 'кеш ' + v + ' с'],
+    ['retry',          v => 'повторов ' + v],
+    ['on_error',       v => 'при сбое: ' + v],
+  ];
+  const TACT_MAX = 3;
+
+  /* Значение select'а хранится кодом (fail, git, browser) — показываем подпись
+     из схемы типа, иначе на карточке проступает служебный словарь. */
+  function optLabel(type, key, v) {
+    const f = ((window.BLOCKS.TYPES[type] || {}).params || []).find(p => p.key === key);
+    if (!f || !f.options) return v;
+    const hit = f.options.find(o => (Array.isArray(o) ? o[0] : o) === v);
+    return hit ? (Array.isArray(hit) ? hit[1] : hit) : v;
+  }
+
+  function tactOf(n) {
+    const p = n.params || {}, out = [];
+    for (const [k, fmt] of TACT) {
+      if (out.length >= TACT_MAX) break;
+      const v = p[k];
+      if (v === undefined || v === '' || v === null) continue;
+      out.push(fmt(optLabel(n.type, k, v)));
+    }
+    return out.join(' · ');
+  }
+
+  /* Факты — одна строка сводки типа, той же, что в плане в консоли. Длинные
+     инструкции обрезаем: карточка — указатель, а не место для чтения ТЗ. */
+  const FACT_CHARS = 88;
+  function factsOf(n) {
+    let s = '';
+    try { s = window.BLOCKS.summary(n) || ''; } catch (e) {}
+    s = String(s).replace(/\s+/g, ' ').trim();
+    return s.length > FACT_CHARS ? s.slice(0, FACT_CHARS - 1).trimEnd() + '…' : s;
+  }
+
+  /* Сводка часто пересказывает то же, что уже стоит в такте или в имени
+     («запуск вручную» под «запуск: вручную»). Повтор занимает строку и ничего
+     не добавляет — убираем. */
+  const bare = s => String(s).toLowerCase().replace(/[^a-zа-яё0-9]+/gi, '');
+  function cardText(n) {
+    const tact = tactOf(n), t = bare(tact);
+    let facts = factsOf(n);
+    /* Сводка нарезана теми же точками-разделителями — выкидываем куски, уже
+       сказанные в такте, а не только полное совпадение целиком. */
+    if (facts) facts = facts.split(' · ').filter(p => !bare(p) || !t.includes(bare(p))).join(' · ');
+    if (facts && bare(n.name).includes(bare(facts))) facts = '';
+    return {
+      cls: def(n.type).label,
+      env: envOf(n),
+      tact,
+      facts,
+      lines: facts ? Math.min(FACT_LINES, Math.ceil(facts.length / 34)) : 0,
+    };
+  }
+
   function chipH(n) {
     const rows = Math.max(ports(n, 'in').length, ports(n, 'out').length);
-    return Math.max(CHIP_MIN_H, PIN_PAD * 2 + Math.max(0, rows - 1) * PIN_STEP);
+    const pins = PIN_PAD * 2 + Math.max(0, rows - 1) * PIN_STEP;
+    if (!detail) return Math.max(CHIP_MIN_H, pins);
+    const c = cardText(n);
+    return Math.max(pins, CARD_PAD * 2 + ROW_NAME + ROW_SUB +
+      (c.tact ? ROW_SUB : 0) + (c.lines ? 7 + ROW_FACT * c.lines : 0));
   }
 
   /* Пин коннектора: группа пинов центрируется по высоте чипа. */
@@ -88,11 +182,19 @@ window.Harness = (function () {
     // высота полосы каждой шины: самый высокий чип × максимум подрядов
     const cellH = cats.map(() => CHIP_MIN_H), subs = cats.map(() => 1);
     nodes.forEach(n => { const r = rowOf(n.type); cellH[r] = Math.max(cellH[r], chipH(n)); });
-    colKeys.forEach(c => cats.forEach((cat, r) => {
-      const list = cols[c][r];
-      if (list) subs[r] = Math.max(subs[r], Math.ceil(list.length / SLOTS_MAX));
-    }));
-    const bandH = cats.map((cat, r) => cellH[r] * subs[r] + GAP_Y * (subs[r] - 1) + 22);
+    const sl = {};                       // колонка → шина → чипов в ряд
+    colKeys.forEach(c => {
+      sl[c] = {};
+      cats.forEach((cat, r) => {
+        const list = cols[c][r]; if (!list) return;
+        const s = slotsFor(list.length);
+        sl[c][r] = s;
+        subs[r] = Math.max(subs[r], Math.ceil(list.length / s));
+      });
+    });
+    /* HEAD_H — место под заголовок зоны ВНУТРИ полосы: подпись, висящая снаружи,
+       на большой схеме теряется между рядами. */
+    const bandH = cats.map((cat, r) => cellH[r] * subs[r] + GAP_Y * (subs[r] - 1) + 22 + HEAD_H);
 
     const bandTop = []; let y = Y0;
     cats.forEach((cat, r) => { bandTop[r] = y; y += bandH[r] + LANE; });
@@ -105,32 +207,35 @@ window.Harness = (function () {
       return v.length ? v.reduce((a, b) => a + b, 0) / v.length : Infinity;
     };
 
+    const W = chipW();
     let cx = X0, maxX = X0;
     colKeys.forEach(c => {
       let slots = 1;
-      cats.forEach((cat, r) => { const l = cols[c][r]; if (l) slots = Math.max(slots, Math.min(SLOTS_MAX, l.length)); });
+      cats.forEach((cat, r) => { if (sl[c][r]) slots = Math.max(slots, sl[c][r]); });
       cats.forEach((cat, r) => {
         const list = cols[c][r]; if (!list) return;
+        const s = sl[c][r] || 1;
         list.sort((a, b) => (bary(a) - bary(b)) || a.id.localeCompare(b.id));
         list.forEach((n, i) => {
           const h = chipH(n);
-          const sx = cx + (i % SLOTS_MAX) * (CHIP_W + GAP_X);
-          const sy = bandTop[r] + 11 + Math.floor(i / SLOTS_MAX) * (cellH[r] + GAP_Y) + (cellH[r] - h) / 2;
-          pos.set(n.id, { x: sx, y: sy, w: CHIP_W, h });
-          maxX = Math.max(maxX, sx + CHIP_W);
+          const sx = cx + (i % s) * (W + GAP_X);
+          const sy = bandTop[r] + 11 + HEAD_H + Math.floor(i / s) * (cellH[r] + GAP_Y) + (cellH[r] - h) / 2;
+          pos.set(n.id, { x: sx, y: sy, w: W, h });
+          maxX = Math.max(maxX, sx + W);
         });
       });
-      cx += slots * (CHIP_W + GAP_X) + COL_GAP;
+      cx += slots * (W + GAP_X) + COL_GAP;
     });
 
     const bx1 = X0 - 30, bx2 = maxX + 30;
     cats.forEach((cat, r) => buses.push({
       id: cat.id, label: cat.label, hint: cat.hint, color: BUS_COLOR[cat.id] || '#5d6a80',
+      count: nodes.filter(n => rowOf(n.type) === r).length,
       x1: bx1, x2: bx2, y1: bandTop[r], y2: bandTop[r] + bandH[r],
     }));
 
     backY = bandTop[cats.length - 1] + bandH[cats.length - 1] + BACK_GAP;
-    box = { x1: bx1 - 20, y1: Y0 - 46, x2: bx2 + 20, y2: backY + 64 };
+    box = { x1: bx1 - 20, y1: Y0 - 20, x2: bx2 + 20, y2: backY + 96 };   // снизу — место под легенду
 
     // ручные позиции чипов (перетаскивание) кладём поверх авто-раскладки;
     // следы удалённых узлов подчищаем, границы вида тянем под утащенные чипы
@@ -222,6 +327,13 @@ window.Harness = (function () {
     server:   { label: 'Сервер',  color: '#64748b', op: 0.07 },
   };
   const Z_PADX = 22, Z_PADY = 12, Z_R = 15;
+  const ENVS = ['client', 'server', 'external'];
+
+  /* Какие среды подсвечены. Среда разбросана по всей схеме и в структуру
+     раскладки не ложится — значит, её надо уметь ВЫЗЫВАТЬ, а не искать глазами.
+     По умолчанию горят клиент и внешнее: серверных узлов в любом плане
+     большинство, их подсветка — сплошной налёт, а не сигнал. */
+  let envShow = { client: true, server: false, external: true };
 
   /* Прямоугольники чипов одной среды из текущей раскладки. */
   function envRects(env) {
@@ -236,7 +348,7 @@ window.Harness = (function () {
   /* Заливка зоны: по прямоугольнику на чип, общая opacity на группе — стыки
      соседних чипов не темнеют. Сервер (обычно фон) — самый бледный. */
   function zonesSVG() {
-    return ['server', 'client', 'external'].map(env => {
+    return ENVS.filter(e => envShow[e]).map(env => {
       const list = envRects(env); if (!list.length) return '';
       const z = ZONE[env];
       const rects = list.map(p =>
@@ -249,8 +361,10 @@ window.Harness = (function () {
      и точек эгресса читается заливкой, без повторов подписи. Сервер — тихий
      фон вовсе без ярлыка. */
   function zoneLabelsHTML() {
+    if (detail) return '';        // в подробном режиме среда подписана на самой карточке
     const out = [];
-    for (const env of ['client', 'external']) {
+    for (const env of ENVS) {
+      if (!envShow[env]) continue;
       const list = envRects(env); if (!list.length) continue;
       const z = ZONE[env];
       const p = list.reduce((a, b) => (b.x < a.x || (b.x === a.x && b.y < a.y)) ? b : a);
@@ -260,11 +374,19 @@ window.Harness = (function () {
   }
 
   /* ── отрисовка ──────────────────────────────────────── */
+  /* Зона = полоса шины. Три слоя, как на архитектурных плакатах: утопленная
+     поверхность (темнее фона) + едва заметный тон категории + одна рамка.
+     Глубина берётся слоями, а не тенями — тень на схеме с сотней узлов мылит. */
   function busSVG() {
-    return buses.map(b => `<g class="hbus">
-      <rect x="${b.x1}" y="${b.y1}" width="${b.x2 - b.x1}" height="${b.y2 - b.y1}" rx="14" fill="${b.color}"/>
-      <rect class="hbus-edge" x="${b.x1}" y="${b.y1}" width="4" height="${b.y2 - b.y1}" rx="2" fill="${b.color}"/>
-    </g>`).join('');
+    return buses.map(b => {
+      const w = (b.x2 - b.x1).toFixed(1), h = (b.y2 - b.y1).toFixed(1);
+      return `<g class="hbus">
+        <rect class="hbus-surf" x="${b.x1}" y="${b.y1}" width="${w}" height="${h}" rx="16"/>
+        <rect class="hbus-tint" x="${b.x1}" y="${b.y1}" width="${w}" height="${h}" rx="16" fill="${b.color}"/>
+        <rect class="hbus-bd" x="${b.x1 + 0.5}" y="${b.y1 + 0.5}" width="${w - 1}" height="${h - 1}" rx="15.5"/>
+        <rect class="hbus-edge" x="${b.x1}" y="${b.y1}" width="3" height="${h}" rx="1.5" fill="${b.color}"/>
+      </g>`;
+    }).join('');
   }
 
   function wiresSVG(sel) {
@@ -294,19 +416,56 @@ window.Harness = (function () {
       const top = p.h / 2 - Math.max(0, arr.length - 1) * PIN_STEP / 2 + i * PIN_STEP;
       return `<i class="hpin ${q.kind}" style="top:${top.toFixed(1)}px" title="${esc(q.label)}"></i>`;
     }).join('');
-    return `<div class="hchip ${sel.has(n.id) ? 'sel' : ''} ${n.enabled === false ? 'off' : ''} ${n.type === 'note' ? 'is-note' : ''}"
+    const bs = window.Build ? window.Build.get(n.id).status : 'todo';
+    const drift = window.Build ? window.Build.drift(n.id) : null;
+    const head = `<span class="hchip-icon">${esc(d.icon)}</span>
+      <span class="hchip-name">${esc(n.name)}</span>
+      <span class="hchip-drift" title="план изменился после отметки">⟳</span>`;
+    let body = head;
+    if (detail) {
+      const c = cardText(n);
+      /* Метка среды подчиняется тому же тумблеру, что и заливка: подсветка
+         среды — одно понятие, а не два раздельных. */
+      const env = (c.env && envShow[c.env])
+        ? `<span class="hc-env ${c.env}">${esc(ZONE[c.env].label)}</span>` : '';
+      body = `<div class="hc-head">${head}</div>
+        <div class="hc-class">${esc(c.cls)}${env}</div>
+        ${c.tact ? `<div class="hc-tact">${esc(c.tact)}</div>` : ''}
+        ${c.lines ? `<div class="hc-facts" style="-webkit-line-clamp:${c.lines}">${esc(c.facts)}</div>` : ''}`;
+    }
+    return `<div class="hchip ${detail ? 'card' : ''} bstat-${bs} ${drift && drift.stale ? 'bdrift' : ''} ${sel.has(n.id) ? 'sel' : ''} ${n.enabled === false ? 'off' : ''} ${n.type === 'note' ? 'is-note' : ''}"
       data-id="${n.id}" style="left:${p.x}px;top:${p.y.toFixed(1)}px;width:${p.w}px;height:${p.h}px;--c:${d.color}"
       title="${esc(n.name)} · ${esc(d.label)}">
-      <span class="hchip-icon">${esc(d.icon)}</span>
-      <span class="hchip-name">${esc(n.name)}</span>
+      ${body}
       <span class="hpins in">${pins('in')}</span>
       <span class="hpins out">${pins('out')}</span>
     </div>`;
   }
 
+  /* Заголовок зоны — внутри полосы, слева сверху: имя, назначение, счётчик. */
   function labelsHTML() {
-    return buses.map(b => `<div class="hbus-label" style="left:${b.x1}px;top:${(b.y1 - 26).toFixed(1)}px;--c:${b.color}">
-      <b>${esc(b.label)}</b><i>${esc(b.hint || '')}</i></div>`).join('');
+    return buses.map(b => `<div class="hbus-label" style="left:${b.x1}px;top:${(b.y1 + 9).toFixed(1)}px;--c:${b.color}">
+      <b>${esc(b.label)}</b><span class="hbus-n">${b.count}</span><i>${esc(b.hint || '')}</i></div>`).join('');
+  }
+
+  /* Легенда: цвет и штрих провода — это словарь, и его надо где-то объявить.
+     Стоит под последней шиной, в потоке чтения после самой схемы. Среды
+     перечисляем только подсвеченные — легенда описывает то, что видно. */
+  const ENV_HINT = { client: 'машина пользователя', server: 'наш сервер', external: 'выход за периметр' };
+  function legendHTML() {
+    if (!buses.length) return '';        // пустой проект: словарь без схемы описывать нечего
+    const line = (cls, txt) => `<span class="hleg-i"><svg width="26" height="8" viewBox="0 0 26 8">
+      <path class="hleg-w ${cls}" d="M1 4H25"/></svg>${esc(txt)}</span>`;
+    const env = ENVS.filter(e => envShow[e] && envRects(e).length).map(e =>
+      `<span class="hleg-i"><i class="hc-env ${e}">${esc(ZONE[e].label)}</i>${esc(ENV_HINT[e])}</span>`).join('');
+    return `<div class="hlegend" style="left:${(box.x1 + 50).toFixed(1)}px;top:${(backY + 26).toFixed(1)}px">
+      <b>Легенда</b>
+      ${line('flow', 'порядок выполнения')}
+      ${line('data', 'знания и данные')}
+      ${line('back', 'возврат цикла')}
+      <span class="hleg-i"><i class="hleg-c"></i>цвет провода — тип блока-источника</span>
+      ${env}
+    </div>`;
   }
 
   function els() {
@@ -346,12 +505,27 @@ window.Harness = (function () {
     const selection = sel || new Set();
     layout();
     $wires.innerHTML = zonesSVG() + busSVG() + wiresSVG(selection);
-    $chips.innerHTML = zoneLabelsHTML() + labelsHTML() + window.Graph.state.nodes.map(n => chipHTML(n, selection)).join('');
+    $chips.innerHTML = zoneLabelsHTML() + labelsHTML() + legendHTML() +
+      window.Graph.state.nodes.map(n => chipHTML(n, selection)).join('');
   }
 
   return {
     render, redraw, bounds: () => box, positionOf: id => pos.get(id) || null,
     chipRects, setManual, resetManual,
     setCollide: v => { collide = !!v; }, getCollide: () => collide,
+    /* Плотность: подробные карточки против обзорных чипов. Ручные позиции
+       сбрасываем — они снимались под другую ширину и после смены разъедутся. */
+    setDetail: v => { const on = !!v; if (on !== detail) { detail = on; manual.clear(); } },
+    getDetail: () => detail,
+    /* Подсветка сред: тумблеры живут в интерфейсе, раскладку не трогают —
+       переключение только перекрашивает, поэтому позиции чипов остаются на месте. */
+    ENVS, envLabel: e => (ZONE[e] || {}).label || e, envColor: e => (ZONE[e] || {}).color || '#5d6a80',
+    setEnvShow: (e, on) => { if (ZONE[e]) envShow[e] = !!on; },
+    getEnvShow: () => Object.assign({}, envShow),
+    envCounts() {
+      const out = { client: 0, server: 0, external: 0 };
+      window.Graph.state.nodes.forEach(n => { const e = envOf(n); if (e && out[e] !== undefined) out[e]++; });
+      return out;
+    },
   };
 })();

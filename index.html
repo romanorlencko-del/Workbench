@@ -31,6 +31,12 @@
     <input id="pipeline-name" class="pipeline-name" spellcheck="false" value="Новый конвейер">
 
     <div class="toolbar">
+      <div class="modeswitch" id="modeswitch">
+        <button class="tb msw on" data-act="mode-plan"  title="Режим: разработка плана — рисуем схему (M)">▤ <span class="lbl-txt">План</span></button>
+        <button class="tb msw"    data-act="mode-build" title="Режим: стройка — что из плана уже построено в коде (M)">⚒ <span class="lbl-txt">Стройка</span></button>
+      </div>
+      <span class="buildcount" id="buildcount" title="Готово блоков из всех в плане"></span>
+      <span class="tb-sep"></span>
       <button class="tb" data-act="new"    title="Новый проект">＋ <span class="lbl-txt">Проект</span></button>
       <button class="tb" data-act="import" title="Импорт JSON">↧ <span class="lbl-txt">Импорт</span></button>
       <button class="tb" data-act="export" title="Экспорт JSON (Ctrl+S)">↥ <span class="lbl-txt">Экспорт</span></button>
@@ -42,6 +48,8 @@
         <button class="tb vsw on" data-act="view-graph"   title="Свободный холст">◻ <span class="lbl-txt">Холст</span></button>
         <button class="tb vsw"    data-act="view-harness" title="Жгут: шины по категориям (H)">⌇ <span class="lbl-txt">Жгут</span></button>
       </div>
+      <button class="tb icon" data-act="hdetail" id="hdetail" hidden
+        title="Жгут: подробные карточки ⇄ плотные чипы">▤</button>
       <span class="tb-sep"></span>
       <button class="tb icon" data-act="layout" title="Разложить схему по слоям (L)">⌗</button>
       <button class="tb icon" data-act="fit"  title="Вместить всё (F)">⛶</button>
@@ -57,18 +65,22 @@
 
   <aside class="panel palette">
     <div class="panel-head">
-      <span class="micro">Блоки</span>
+      <span class="micro plan-only">Блоки</span>
+      <span class="micro build-only">Очередь работ</span>
       <input id="palette-search" class="search" placeholder="поиск…" spellcheck="false">
       <button class="tb icon" data-act="palette-min" id="palette-min" title="Свернуть блоки влево">«</button>
       <button class="tb icon drawer-close" data-act="close-drawers" title="Закрыть">✕</button>
     </div>
-    <div id="palette-list" class="palette-list"></div>
-    <div class="palette-foot micro">перетащи блок на холст&nbsp;· или клик
+    <div id="palette-list" class="palette-list plan-only"></div>
+    <div id="queue-list" class="queue-list build-only"></div>
+    <div class="palette-foot micro plan-only">перетащи блок на холст&nbsp;· или клик
       <button class="linkbtn" data-act="load-pipeline">загрузить конвейер проекта</button>
       <button class="linkbtn dim" data-act="demo" title="Сам Workbench, описанный своими блоками">схема конструктора</button>
     </div>
-    <button class="pal-rail" data-act="palette-min" title="Развернуть блоки">
-      <span class="pal-rail-ico">☰</span><span class="pal-rail-txt">Блоки</span>
+    <button class="pal-rail" data-act="palette-min" title="Развернуть">
+      <span class="pal-rail-ico">☰</span>
+      <span class="pal-rail-txt plan-only">Блоки</span>
+      <span class="pal-rail-txt build-only">Очередь</span>
     </button>
   </aside>
 
@@ -90,6 +102,7 @@
         <button class="hud-btn zoom-val" data-act="zoom-reset" id="zoom-val">100%</button>
         <button class="hud-btn" data-act="zoom-in">+</button>
       </div>
+      <div class="envbox" id="envbox" hidden></div>
       <div class="hints micro">
         <b>трекпад / колесо</b> панорама · <b>Ctrl+колесо, щипок</b> зум · <b>ПКМ / пробел</b> тянуть холст ·
         <b>тяни порт</b> связь · <b>Del</b> удалить · <b>Ctrl+D</b> дубль
@@ -195,7 +208,7 @@
 <script>
 /* Грузим скрипты с меткой времени: без сборщика браузер иначе отдаёт старый js
    после правок. async=false сохраняет порядок выполнения. */
-['js/blocks.js', 'js/example.js', 'js/pipeline.js', 'js/graph.js',
+['js/blocks.js', 'js/example.js', 'js/pipeline.js', 'js/graph.js', 'js/build.js',
  'js/collide.js', 'js/harness.js', 'js/editor.js', 'js/inspector.js', 'js/app.js'].forEach(src => {
   const s = document.createElement('script');
   s.src = src + '?t=' + Date.now();

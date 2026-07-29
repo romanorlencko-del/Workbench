@@ -332,6 +332,7 @@ window.Graph = (function () {
     state.nodes = data.nodes.filter(n => n && n.id && T()[n.type]).map(n => {
       const def = T()[n.type];
       return {
+        ...n,                       // свои поля узла (collapsed и пр.) не теряем
         id: n.id, type: n.type,
         name: n.name || def.label,
         x: Number.isFinite(n.x) ? n.x : 0,

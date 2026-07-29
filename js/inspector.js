@@ -93,6 +93,70 @@ window.Inspector = (function () {
     </div>`;
   }
 
+  /* ── стройка: слой «что уже построено», виден только в режиме стройки ──
+     Правки отсюда НЕ идут в план: ни в историю Ctrl+Z, ни в экспорт, ни в бриф. */
+  const buildMode = () => document.getElementById('app').classList.contains('mode-build');
+
+  const tsShort = ts => new Date(ts).toLocaleString('ru-RU',
+    { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+  /* Протух — говорим ЧТО именно разъехалось: правка самого блока и правка
+     контракта у соседа сверху лечатся по-разному, и общее «устарел» бесполезно. */
+  function driftNote(node) {
+    const d = window.Build.drift(node.id);
+    if (!d.stale) return '';
+    const names = d.deps.map(id => (window.Graph.getNode(id) || {}).name || id);
+    const why = [
+      d.self ? 'правили сам блок' : '',
+      names.length ? 'сменился контракт входа: ' + names.map(n => '«' + n + '»').join(', ') : '',
+    ].filter(Boolean).join('; ');
+    return `<div class="bdrift-note">
+        <span><b>⟳ план ушёл вперёд</b><br>${esc(why)}.
+          ${d.at ? 'Отмечено по плану от ' + esc(tsShort(d.at)) + '.' : ''}</span>
+        <button class="tb" data-act="build-accept" title="Код перечитан и нынешнему плану соответствует">Принял</button>
+      </div>`;
+  }
+
+  function buildBlock(node) {
+    if (!buildMode() || !window.Build) return '';
+    const rec = window.Build.get(node.id);
+    const opts = window.Build.STATUSES.map(([v, l]) =>
+      `<option value="${v}" ${v === rec.status ? 'selected' : ''}>${esc(l)}</option>`).join('');
+    const when = rec.updatedAt
+      ? 'отмечено ' + new Date(rec.updatedAt).toLocaleString('ru-RU')
+      : 'ещё не отмечалось';
+    const log = rec.log.length
+      ? rec.log.map(e => `<div class="blog-row"><span class="blog-ts">${esc(tsShort(e.ts))}</span><span>${esc(e.text)}</span></div>`).join('')
+      : '<div class="blog-row blog-empty">пока пусто</div>';
+    return `<div class="sep"><span class="micro">стройка</span>
+        <span class="bpill bstat-${rec.status}">${esc(window.Build.label(rec.status))}</span></div>
+      ${driftNote(node)}
+      <div class="fld"><label class="lbl" for="build-status">Состояние</label>
+        <select id="build-status" data-build-key="status">${opts}</select>
+        <span class="hint micro">${esc(when)}</span></div>
+      <div class="fld"><label class="lbl" for="build-target">Куда пишем</label>
+        <textarea id="build-target" data-build-key="target" rows="2" spellcheck="false"
+          placeholder="src/auth/login.py&#10;tests/test_login.py">${esc(rec.target.join('\n'))}</textarea>
+        <span class="hint micro">по одному пути в строке — файлы и папки в репозитории</span></div>
+      <div class="fld"><label class="lbl" for="build-checks">Чем проверять</label>
+        <input id="build-checks" data-build-key="checks" value="${esc(rec.checks)}" spellcheck="false"
+          placeholder="pytest tests/test_login.py"></div>
+      <div class="fld"><label class="lbl" for="build-owner">Кто делает</label>
+        <input id="build-owner" data-build-key="owner" value="${esc(rec.owner)}" spellcheck="false"
+          placeholder="я · cursor · claude"></div>
+      <div class="bops">
+        <button class="tb primary" data-act="build-order"
+          title="Собрать ТЗ по этому блоку: что построить, что на входе, что обязано получиться">📋 Выдать задание</button>
+        <span class="hint micro">срез плана вокруг блока — в буфер и приложению через мост</span>
+      </div>
+      <div class="sep"><span class="micro">журнал</span></div>
+      <div class="blog">${log}</div>
+      <div class="fld bnote">
+        <input id="build-note" placeholder="что произошло…" spellcheck="false">
+        <button class="tb" data-act="build-note" title="Добавить запись (Enter)">Записать</button>
+      </div>`;
+  }
+
   function renderNode(node) {
     const d = window.BLOCKS.TYPES[node.type];
     const fields = window.BLOCKS.visibleParams(node.type, node.params)
@@ -104,6 +168,7 @@ window.Inspector = (function () {
         <input class="name-input" id="node-name" value="${esc(node.name)}" spellcheck="false">
       </div>
       <p class="insp-desc">${esc(d.desc)}</p>
+      ${buildBlock(node)}
       <div class="fld row"><label class="lbl" for="node-on">Активен</label>
         <input id="node-on" type="checkbox" data-node-flag="enabled" ${node.enabled !== false ? 'checked' : ''}></div>
       <div class="sep"><span class="micro">параметры</span></div>
@@ -195,7 +260,7 @@ window.Inspector = (function () {
   };
 
   /* Поле внутри списка приходит ключом «список#индекс#поле». */
-  function commitListField(el, live) {
+  function commitListField(el) {
     const [key, idxRaw, sub] = el.dataset.key.split('#');
     const parent = (window.BLOCKS.TYPES[current.type].params || []).find(p => p.key === key);
     if (!parent) return;
@@ -211,22 +276,21 @@ window.Inspector = (function () {
       row.querySelector('.list-name').textContent = parent.itemLabel ? parent.itemLabel(items[idx]) : (items[idx].role || '');
       if (parent.itemBadge) row.querySelector('.list-dot').className = 'list-dot ' + (parent.itemBadge(items[idx]) || 'inherit');
     }
-    onChange('param', live);
+    onChange('param');
   }
 
-  function commitField(el, live) {
+  function commitField(el) {
     const key = el.dataset.key;
     if (!key || !current) return;
-    if (key.includes('#')) return commitListField(el, live);
+    if (key.includes('#')) return commitListField(el);
     const f = (window.BLOCKS.TYPES[current.type].params || []).find(p => p.key === key);
     let v = el.type === 'checkbox' ? el.checked : el.value;
     if (f && f.type === 'number') v = v === '' ? '' : Number(v);
     if (f && f.type === 'tags') v = String(v).split(',').map(s => s.trim()).filter(Boolean);
     current.params[key] = v;
-    // select/bool меняют видимость полей и НАБОР портов — это структурная правка:
-    // применяем сразу как завершённую (перечёт портов + история), а не как «живой» ввод
-    if (f && (f.type === 'select' || f.type === 'bool')) { renderNode(current); return onChange('param', false); }
-    onChange('param', live);
+    // поля с when() могут появиться/исчезнуть
+    if (f && (f.type === 'select' || f.type === 'bool')) renderNode(current);
+    onChange('param');
   }
 
   function init(opts) {
@@ -234,35 +298,54 @@ window.Inspector = (function () {
     $body = document.getElementById('insp-body');
     $badge = document.getElementById('insp-badge');
 
-    // input = живой ввод (live:true) — лёгкое обновление без обрезки связей и истории
     $body.addEventListener('input', e => {
       const el = e.target;
-      if (el.id === 'node-name' && current) { current.name = el.value; onChange('rename', true); return; }
-      if (el.id === 'node-notes' && current) { current.notes = el.value; onChange('notes', true); return; }
-      if (el.id === 'meta-name') { window.Graph.state.name = el.value; document.getElementById('pipeline-name').value = el.value; onChange('meta', true); return; }
+      if (el.id === 'node-name' && current) { current.name = el.value; onChange('rename'); return; }
+      if (el.id === 'node-notes' && current) { current.notes = el.value; onChange('notes'); return; }
+      if (el.id === 'meta-name') { window.Graph.state.name = el.value; document.getElementById('pipeline-name').value = el.value; onChange('meta'); return; }
       if (el.dataset.meta) {
         const v = el.type === 'number' ? Number(el.value) : el.value;
         const path = el.dataset.meta.split('.');            // models.primary.model
         let t = window.Graph.state.meta;
         while (path.length > 1) t = t[path.shift()];
         t[path[0]] = v;
-        onChange('meta', true); return;
+        onChange('meta'); return;
       }
-      if (el.dataset.nodeFlag && current) { current.enabled = el.checked; onChange('flag', false); return; }
-      commitField(el, true);
+      if (el.dataset.nodeFlag && current) { current.enabled = el.checked; onChange('flag'); return; }
+      commitField(el);
     });
 
-    // change = завершение правки (blur / выбор) — «тяжёлый» проход: перечёт портов + запись в историю
     $body.addEventListener('change', e => {
-      const el = e.target;
-      if (el.id === 'node-name' && current) return onChange('rename', false);
-      if (el.id === 'node-notes' && current) return onChange('notes', false);
-      if (el.id === 'meta-name' || el.dataset.meta) return onChange('meta', false);
-      if (el.dataset.key) return commitField(el, false);
-      if (el.dataset.nodeFlag && current) { current.enabled = el.checked; onChange('flag', false); }
+      /* стройка отдельно от плана: своё хранилище, onChange не зовём — план не менялся */
+      if (e.target.dataset.buildKey && current) {
+        const k = e.target.dataset.buildKey;
+        const v = k === 'target' ? e.target.value.split('\n').map(s => s.trim()).filter(Boolean)
+                                 : e.target.value;
+        window.Build.set(current.id, { [k]: v });
+        return renderNode(current);
+      }
+      if (e.target.dataset.key) commitField(e.target);
+      if (e.target.dataset.nodeFlag && current) { current.enabled = e.target.checked; onChange('flag'); }
+    });
+
+    /* запись в журнал стройки: кнопкой или Enter в поле */
+    const addNote = () => {
+      const inp = document.getElementById('build-note');
+      if (!inp || !current) return;
+      window.Build.note(current.id, inp.value);
+      renderNode(current);
+    };
+    $body.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && e.target.id === 'build-note') { e.preventDefault(); addNote(); }
     });
 
     $body.addEventListener('click', e => {
+      if (e.target.dataset.act === 'build-note') return addNote();
+      if (e.target.dataset.act === 'build-accept' && current) {
+        window.Build.accept(current.id);
+        return renderNode(current);
+      }
+      if (e.target.dataset.act === 'build-order' && current) return window.App.issueOrder(current.id);
       if (e.target.dataset.act === 'del-node' && current) {
         window.Editor.select(current.id); window.Editor.deleteSelection();
         return;

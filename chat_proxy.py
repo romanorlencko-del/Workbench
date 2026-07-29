@@ -33,8 +33,8 @@ PORT = int(os.environ.get("TESTER_PROXY_PORT", "8792"))
 TIMEOUT = float(os.environ.get("TESTER_PROXY_TIMEOUT", "180"))
 MAX_BODY = 8 * 1024 * 1024            # потолок входящего тела (иначе память съедят)
 MAX_RESPONSE = 32 * 1024 * 1024       # потолок ответа провайдера (X-Upstream-Url под контролем клиента)
-ALLOW_HEADERS = "Content-Type, Authorization, X-Upstream-Url, X-Api-Key-Env, X-Prev-Mtime, anthropic-version"
-# по умолчанию — только локальный конструктор; serve.py переопределит под свой порт статики
+ALLOW_HEADERS = "Content-Type, Authorization, X-Upstream-Url, X-Api-Key-Env, anthropic-version"
+# кого пускаем. serve.py перезаписывает под свой реальный порт при старте
 ALLOWED_ORIGINS = {"http://localhost:8791", "http://127.0.0.1:8791"}
 
 # ── мост «приложение → конструктор» ─────────────────────────────────────────
@@ -42,10 +42,31 @@ ALLOWED_ORIGINS = {"http://localhost:8791", "http://127.0.0.1:8791"}
 # плана на /bridge/ops; браузер-конструктор опрашивает /bridge/pull и применяет
 # их. Обратно браузер шлёт текущий план на /bridge/plan, чтобы приложение видело
 # актуальную карту (/bridge/plan GET). Состояние живёт в памяти процесса.
+#
+# Стройка ездит тем же мостом, но в другую сторону: конструктор кладёт ЗАДАНИЕ на
+# блок (/bridge/task), приложение забирает его инструментом get_task, а отчёт шлёт
+# обратно обычной операцией {"build":[…]} на /bridge/ops. Задание живёт до отчёта:
+# приложение может перечитать его посреди работы.
+#
+# ПРОЕКТ В КАЖДОМ СООБЩЕНИИ. Проектов у человека несколько, а id блоков в них
+# совпадают (agent_3 есть почти везде) — поэтому неподписанная операция может
+# молча лечь не в тот план. Мост знает, какой проект сейчас открыт (его называет
+# сам конструктор, присылая план), и операцию с ЧУЖИМ проектом отбивает 409, а
+# неподписанную штампует текущим. Браузер потом проверяет ещё раз — две линии
+# защиты, потому что вкладок может быть две и гонки настоящие.
 _BRIDGE_MAX = 500
+_TASK_MAX = 40
 _bridge_lock = threading.Lock()
 _bridge_ops = []                 # очередь операций: приложение → браузер
-_bridge_plan = {"json": None}    # последний план: браузер → приложение
+_bridge_plan = {"json": None, "project": None}   # последний план + чей он
+_bridge_tasks = {}               # выданные задания: id блока → задание (порядок выдачи)
+
+
+def _pid(v):
+    """id проекта из чего угодно: строка, {'id':...} или None."""
+    if isinstance(v, dict):
+        v = v.get("id")
+    return str(v) if v else None
 
 
 class Proxy(BaseHTTPRequestHandler):
@@ -67,7 +88,7 @@ class Proxy(BaseHTTPRequestHandler):
         self._cors()
         self.send_header("Content-Type", "application/json")
         self.end_headers()
-        self.wfile.write(json.dumps(obj, ensure_ascii=False).encode("utf-8"))
+        self.wfile.write(json.dumps(obj).encode("utf-8"))
 
     def do_OPTIONS(self):
         self.send_response(204)
@@ -139,13 +160,13 @@ class Proxy(BaseHTTPRequestHandler):
     def _body_json(self):
         raw = self._read_body()
         if raw is False:
-            return False        # плохой размер — считаем ошибкой
-        if raw is None:
-            return None         # тела нет
+            return False
+        if not raw:
+            return None
         try:
             return json.loads(raw.decode("utf-8"))
         except Exception:
-            return False        # тело было, но не JSON
+            return False  # тело было, но не JSON
 
     def _bridge_get(self):
         if self.path.startswith("/bridge/pull"):
@@ -155,8 +176,17 @@ class Proxy(BaseHTTPRequestHandler):
             return self._json(200, {"ops": ops})
         if self.path.startswith("/bridge/plan"):
             with _bridge_lock:
-                plan = _bridge_plan["json"]
-            return self._json(200, {"plan": plan})
+                plan, project = _bridge_plan["json"], _bridge_plan["project"]
+            return self._json(200, {"plan": plan, "project": project})
+        if self.path.startswith("/bridge/task"):
+            # не вычищаем: исполнитель имеет право перечитать задание в середине работы.
+            # Чужие проекты не показываем вовсе — нельзя взять работу не из той схемы.
+            with _bridge_lock:
+                project = _bridge_plan["project"]
+                cur = _pid(project)
+                tasks = [t for t in _bridge_tasks.values()
+                         if not cur or not _pid(t.get("project")) or _pid(t.get("project")) == cur]
+            return self._json(200, {"tasks": tasks, "project": project})
         self._json(404, {"error": "unknown bridge route", "path": self.path})
 
     def _bridge_post(self):
@@ -167,20 +197,69 @@ class Proxy(BaseHTTPRequestHandler):
             return self._json(415, {"error": "мост принимает только application/json"})
         body = self._body_json()
         if body is False:
-            return self._json(400, {"error": "тело не JSON"})
+            return self._json(400, {"error": "тело не JSON или слишком большое"})
         if self.path.startswith("/bridge/ops"):
             if not isinstance(body, (dict, list)):
                 return self._json(400, {"error": "нужен объект операций или список"})
             items = body if isinstance(body, list) else (body.get("ops") if "ops" in body else [body])
+            claim = _pid(body.get("project")) if isinstance(body, dict) else None
             with _bridge_lock:
+                project = _bridge_plan["project"]
+                cur = _pid(project)
+                if not cur:
+                    return self._json(409, {"error": "конструктор ещё не представился: открой Workbench "
+                                                     "и включи «Сопряжение», тогда мост узнает проект"})
+                if claim and claim != cur:
+                    return self._json(409, {
+                        "error": "операция для другого проекта — в конструкторе сейчас открыт «%s» (%s), "
+                                 "а операция помечена %s. Перечитай план (get_plan) и повтори."
+                                 % ((project or {}).get("name", "?"), cur, claim),
+                        "current": project, "claimed": claim})
+                # каждый элемент проверяем отдельно: список операций тоже несёт
+                # подписи, и пропустить его целиком по одной внешней — та же дыра
+                for it in items:
+                    if not isinstance(it, dict):
+                        continue
+                    own = _pid(it.get("project"))
+                    if own and own != cur:
+                        return self._json(409, {
+                            "error": "в пачке операция для другого проекта (%s), открыт %s — ничего не приняли"
+                                     % (own, cur), "current": project})
+                # неподписанные штампуем текущим: у браузера будет чем их проверить
+                for it in items:
+                    if isinstance(it, dict) and not _pid(it.get("project")):
+                        it["project"] = cur
                 _bridge_ops.extend(items)
                 del _bridge_ops[:-_BRIDGE_MAX]  # не растём бесконечно, держим хвост
                 pending = len(_bridge_ops)
-            return self._json(200, {"ok": True, "queued": len(items), "pending": pending})
+            return self._json(200, {"ok": True, "queued": len(items), "pending": pending, "project": cur})
         if self.path.startswith("/bridge/plan"):
+            # {project:{id,name,rev}, plan:{...}} — или голый план от старого клиента
             with _bridge_lock:
-                _bridge_plan["json"] = body
+                if isinstance(body, dict) and "plan" in body:
+                    _bridge_plan["json"] = body.get("plan")
+                    _bridge_plan["project"] = body.get("project")
+                else:
+                    _bridge_plan["json"] = body
             return self._json(200, {"ok": True})
+        if self.path.startswith("/bridge/task"):
+            if not isinstance(body, dict) or not body.get("id"):
+                return self._json(400, {"error": "нужен объект задания с id блока"})
+            tid = str(body["id"])
+            with _bridge_lock:
+                cur = _pid(_bridge_plan["project"])
+                claim = _pid(body.get("project"))
+                if cur and claim and claim != cur:
+                    return self._json(409, {"error": "задание для другого проекта", "current": _bridge_plan["project"]})
+                if body.get("done"):
+                    _bridge_tasks.pop(tid, None)          # отчёт пришёл — снимаем с доски
+                else:
+                    _bridge_tasks.pop(tid, None)          # перевыдача встаёт в конец очереди
+                    _bridge_tasks[tid] = body
+                    for old in list(_bridge_tasks)[:-_TASK_MAX]:
+                        del _bridge_tasks[old]
+                pending = len(_bridge_tasks)
+            return self._json(200, {"ok": True, "pending": pending})
         self._json(404, {"error": "unknown bridge route", "path": self.path})
 
     def do_GET(self):

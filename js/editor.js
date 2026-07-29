@@ -76,11 +76,16 @@ window.Editor = (function () {
       <button class="port ${p.kind}" data-node="${n.id}" data-port="${p.id}" data-dir="${dir}" data-kind="${p.kind}"
               style="top:${HEAD_H + i * PORT_STEP}px" title="${esc(p.label)}"><i></i><span class="port-label">${esc(p.label)}</span></button>`).join('');
 
-    return `<div class="node ${selection.has(n.id) ? 'sel' : ''} ${n.enabled === false ? 'off' : ''} ${n.type === 'note' ? 'is-note' : ''} ${n.collapsed ? 'collapsed' : ''}"
+    /* классы стройки ставим всегда, показывает их только режим стройки — так
+       переключение режима не требует перерисовки холста */
+    const bs = window.Build ? window.Build.get(n.id).status : 'todo';
+    const drift = window.Build ? window.Build.drift(n.id) : null;
+    return `<div class="node bstat-${bs} ${drift && drift.stale ? 'bdrift' : ''} ${selection.has(n.id) ? 'sel' : ''} ${n.enabled === false ? 'off' : ''} ${n.type === 'note' ? 'is-note' : ''} ${n.collapsed ? 'collapsed' : ''}"
                  data-id="${n.id}" style="left:${n.x}px;top:${n.y}px;${n.collapsed ? '' : `min-height:${minH}px;`}--c:${d.color}">
       <header class="node-head" title="двойной клик — свернуть или развернуть">
         <span class="node-icon">${esc(d.icon)}</span>
         <span class="node-title">${esc(n.name)}</span>
+        <span class="node-drift" title="план изменился после отметки">⟳</span>
         <span class="node-kind">${n.collapsed ? '▸' : esc(n.type)}</span>
       </header>
       <div class="node-body">

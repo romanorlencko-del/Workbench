@@ -1,0 +1,19 @@
+name: tests
+
+# Быстрый прогон движка проверок на каждый push и pull request.
+# Ловит регресс в graph.js/blocks.js ДО того, как ставится релизный тег.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Прогнать наборы проверок (без зависимостей)
+        run: node test/run.js

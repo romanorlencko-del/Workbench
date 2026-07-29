@@ -1,0 +1,9 @@
+{
+  "name": "workbench",
+  "private": true,
+  "description": "Workbench — визуальный конструктор конвейеров. Тесты движка проверок, без зависимостей.",
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "node test/run.js"
+  }
+}

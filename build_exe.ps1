@@ -11,6 +11,7 @@ py -m PyInstaller --noconfirm --onefile --name Workbench `
   --hidden-import chat_proxy `
   --add-data "index.html;." `
   --add-data "AI_GUIDE.md;." `
+  --add-data "mcp_server.py;." `
   --add-data "css;css" `
   --add-data "js;js" `
   serve.py

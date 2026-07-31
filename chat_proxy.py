@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""chat_proxy.py — эгресс-прокси движка для чата Workbench.
+"""chat_proxy.py — эгресс-прокси движка для чата Bench.
 
 Зачем: облачные LLM-API (OpenAI/Anthropic/совместимые) не пускают браузер
 напрямую (CORS). Браузер шлёт запрос сюда, на localhost; прокси форвардит его
@@ -207,7 +207,7 @@ class Proxy(BaseHTTPRequestHandler):
                 project = _bridge_plan["project"]
                 cur = _pid(project)
                 if not cur:
-                    return self._json(409, {"error": "конструктор ещё не представился: открой Workbench "
+                    return self._json(409, {"error": "конструктор ещё не представился: открой Bench "
                                                      "и включи «Сопряжение», тогда мост узнает проект"})
                 if claim and claim != cur:
                     return self._json(409, {

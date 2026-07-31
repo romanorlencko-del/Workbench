@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Workbench — запуск (нужен Python 3).
+# Bench — запуск (нужен Python 3).
 cd "$(dirname "$0")" || exit 1
 if command -v python3 >/dev/null 2>&1; then
   exec python3 serve.py

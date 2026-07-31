@@ -773,6 +773,40 @@ textarea.code.bad{border-color:var(--err);box-shadow:0 0 0 3px rgba(248,113,113,
   border:1px solid color-mix(in oklab,var(--zc) 34%,transparent);
 }
 
+/* Контуры сервисов: обводкой (среды — заливкой), чтобы читались вместе.
+   Штрих плотнее пунктира данных, но не сплошной — «граница контура», а не провод. */
+.hunit{pointer-events:none}
+.hunit rect{fill-opacity:.05;stroke-width:1.6;stroke-dasharray:7 4;stroke-opacity:.85}
+.hunit-label{
+  position:absolute;pointer-events:none;white-space:nowrap;
+  font-family:var(--mono);font-size:10px;letter-spacing:.04em;font-weight:600;color:var(--uc);
+  padding:1px 7px;border-radius:6px;
+  background:color-mix(in oklab,var(--uc) 15%,rgba(8,10,15,.72));
+  border:1px solid color-mix(in oklab,var(--uc) 42%,transparent);
+}
+.unitbox{
+  display:flex;align-items:center;gap:6px;flex:none;pointer-events:auto;padding:4px 8px;flex-wrap:wrap;
+  max-width:min(560px,60vw);
+  background:rgba(14,17,24,.9);backdrop-filter:blur(8px);
+  border:1px solid var(--line);border-radius:9px;
+}
+.unit-all{
+  display:inline-flex;align-items:center;gap:6px;cursor:pointer;
+  padding:3px 9px;border-radius:7px;font-size:10.5px;letter-spacing:.02em;
+  color:var(--mute);background:none;border:1px solid var(--line-soft);
+  transition:color .12s ease,border-color .12s ease,background .12s ease;
+}
+.unit-all b{font-family:var(--mono);font-size:9.5px;font-weight:600;opacity:.8}
+.unit-all:hover{color:var(--dim);border-color:var(--line)}
+.unit-all.on{color:var(--fg);border-color:var(--line);background:color-mix(in oklab,var(--fg) 8%,transparent)}
+.unit-sw{
+  display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);
+  padding:2px 8px;border-radius:6px;font-size:10px;color:var(--uc);
+  border:1px solid color-mix(in oklab,var(--uc) 40%,transparent);
+  background:color-mix(in oklab,var(--uc) 12%,transparent);
+}
+.unit-sw b{font-size:9px;opacity:.8}
+
 /* ── адаптив ─────────────────────────────────────────── */
 /* топбар разросся (переключатель проектов + ИИ) — ужимаем ступенями,
    чтобы «Прогон» не срезало на широких, но не бесконечных экранах */
@@ -997,3 +1031,13 @@ textarea.code.bad{border-color:var(--err);box-shadow:0 0 0 3px rgba(248,113,113,
   .cd-w,.cd-corner{display:none}        /* ширина по экрану — тянем только высоту */
   .chat-launcher{right:10px;bottom:10px}
 }
+
+/* ── папка сборок: обзор дерева и карта раскладки ─────────────────────── */
+.ws-tree{margin-top:8px;max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--bg-2)}
+.ws-bar{position:sticky;top:0;display:flex;gap:6px;align-items:center;padding:6px 8px;background:var(--bg-3);border-bottom:1px solid var(--line)}
+.ws-bar b{flex:1;font-weight:600;font-size:12px;word-break:break-all}
+.ws-dir{display:block;width:100%;text-align:left;padding:5px 10px;border:0;background:none;color:var(--fg);font:inherit;font-size:13px;cursor:pointer}
+.ws-dir:hover{background:var(--bg-3)}
+.ws-dir::before{content:'▸ ';opacity:.5}
+.ws-map{display:flex;gap:8px;justify-content:space-between;padding:2px 0;border-top:1px dashed var(--line);margin-top:4px}
+.ws-map i{font-style:normal;opacity:.75;word-break:break-all;text-align:right}

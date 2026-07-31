@@ -74,7 +74,7 @@ def _push_ops(ops):
 
 def _digest_plan(plan, project=None):
     if not plan:
-        return ("План ещё не получен от конструктора. Открой Workbench в браузере "
+        return ("План ещё не получен от конструктора. Открой Bench в браузере "
                 "и включи «Сопряжение» (кнопка ✦ ИИ → секция MCP).")
     nodes = plan.get("nodes") or []
     edges = plan.get("edges") or []
@@ -288,7 +288,7 @@ def call_tool(name, args):
                 rep[k] = args[k]
         _push_ops({"build": [rep]})
         return ("отчёт по блоку %s отправлен%s - конструктор применит его при ближайшем опросе (~1.5 с). "
-                "Открыт ли Workbench в браузере и включено ли «Сопряжение»?"
+                "Открыт ли Bench в браузере и включено ли «Сопряжение»?"
                 % (args["id"], (" (проект %s)" % _state["project"]) if _state["project"] else ""))
     if name == "apply_ops":
         ops = {k: args[k] for k in ("add", "edges", "patch", "del", "layout") if k in args}
@@ -338,7 +338,7 @@ def handle(msg):
             _result(rid, {"content": [{"type": "text", "text": "конструктор отказал: %s" % e}], "isError": True})
         except urllib.error.URLError as e:
             _result(rid, {"content": [{"type": "text",
-                     "text": "движок недоступен (%s). Запущен ли Workbench и его прокси? %s" % (ENGINE, e)}],
+                     "text": "движок недоступен (%s). Запущен ли Bench и его прокси? %s" % (ENGINE, e)}],
                      "isError": True})
         except Exception as e:
             _result(rid, {"content": [{"type": "text", "text": "ошибка инструмента: %s" % e}], "isError": True})

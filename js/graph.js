@@ -1116,7 +1116,7 @@ window.Graph = (function () {
   }
 
   function fromJSON(data) {
-    if (!data || !Array.isArray(data.nodes)) throw new Error('файл не похож на конвейер Workbench');
+    if (!data || !Array.isArray(data.nodes)) throw new Error('файл не похож на конвейер Bench');
     state.version = data.version || 1;
     state.name = data.name || 'Конвейер';
     const m = data.meta || {};

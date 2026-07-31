@@ -93,7 +93,16 @@ window.App = (function () {
     if (p) { p.name = d.data.name || p.name; p.updatedAt = (d.mtime || 0) * 1000; saveRegistry(reg); }
     if (id === projectId) {
       loadProjectState(id);
-      toast('Взял более свежую версию проекта с диска (правки из другой вкладки).', 'warn');
+      /* Подключение к моделям живёт отдельно от плана (tester.models) и не должно
+         гибнуть в гонке за схему: человек нажал «Сохранить подключения», получил
+         409 из-за чужой правки узлов — и молча остался без base_url. Возвращаем
+         сохранённое подключение поверх принятой с диска версии. */
+      const was = JSON.stringify(((window.Graph.state.meta || {}).models) || {});
+      seedModelsFromGlobal(false);
+      const now = JSON.stringify(((window.Graph.state.meta || {}).models) || {});
+      if (now !== was) saveNow();
+      toast('Взял более свежую версию проекта с диска (правки из другой вкладки).' +
+            (now !== was ? ' Подключение к моделям сохранено.' : ''), 'warn');
     }
   }
   function diskDelete(id) {
@@ -333,6 +342,7 @@ window.App = (function () {
     renderBuildCount();
     renderQueue();
     renderEnvBox();          // состав плана поменялся — счётчики сред тоже
+    renderUnitBox();         // и состав сервисов
   }
 
   function onGraphChange() { commit(); refresh(); }
@@ -659,6 +669,7 @@ window.App = (function () {
     document.querySelectorAll('.vsw').forEach(b => b.classList.toggle('on', b.dataset.act === 'view-' + m));
     syncDetailBtn(m);
     renderEnvBox();
+    renderUnitBox();
   }
 
   /* Плотность жгута: подробные карточки (грамматика плаката) против обзорных
@@ -703,6 +714,27 @@ window.App = (function () {
     window.Editor.render();          // только перекраска: раскладка не менялась
   }
 
+  /* Контуры сервисов (единицы развёртывания) — второе сечение того же графа,
+     обводкой поверх заливки сред. Прячем, когда в плане нет ни одного unit:
+     на схемах без микросервисов кнопке нечего показывать. */
+  function renderUnitBox() {
+    const el = document.getElementById('unitbox'); if (!el) return;
+    const H = window.Harness, units = H.unitNames ? H.unitNames() : [];
+    const on = H.getUnitShow && H.getUnitShow();
+    el.innerHTML = `<button class="unit-all ${on ? 'on' : ''}" data-act="unit-toggle"
+        title="Обвести контуры сервисов (единиц развёртывания)">◫ сервисы<b>${units.length}</b></button>` +
+      (on ? units.map(u =>
+        `<span class="unit-sw" style="--uc:${u.color}" title="${esc(u.name)} · ${u.count} блока">${esc(u.name)}<b>${u.count}</b></span>`).join('') : '');
+    el.hidden = window.Editor.getViewMode() !== 'harness' || !units.length;
+  }
+  function toggleUnit() {
+    const H = window.Harness, on = !(H.getUnitShow && H.getUnitShow());
+    H.setUnitShow(on);
+    const s = loadLayout(); s.hUnit = on; saveLayout(s);
+    renderUnitBox();
+    window.Editor.render();          // только перекраска: раскладка не менялась
+  }
+
   function switchTab(tab) {
     document.querySelectorAll('.ctab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
     document.querySelectorAll('.ctab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
@@ -723,6 +755,109 @@ window.App = (function () {
   }
   function loadProxy() { try { return JSON.parse(localStorage.getItem(LS_PROXY) || '{}') || {}; } catch (e) { return {}; } }
   function saveProxy(obj) { try { localStorage.setItem(LS_PROXY, JSON.stringify(obj)); } catch (e) {} }
+
+  /* ── папка сборок: один корень, внутри по папке на проект ────────────────
+     Конструктор кода не пишет — пишет исполнитель по заданию. Поэтому папка
+     нужна не движку, а заданию: без неё исполнитель кладёт файлы туда, где
+     сам оказался, и проекты перемешиваются. Корень выбирается один раз и
+     живёт локально (не в плане: у каждой машины он свой). */
+  const LS_PATHS = 'tester.paths';
+  let wsLast = null;                       // последняя раскладка — показать человеку, что куда легло
+  function loadPaths() { try { return JSON.parse(localStorage.getItem(LS_PATHS) || '{}') || {}; } catch (e) { return {}; } }
+  function savePaths(o) { try { localStorage.setItem(LS_PATHS, JSON.stringify(o)); } catch (e) {} }
+  function wsRootField() { const el = document.getElementById('ws-root'); return el ? el.value.trim() : ''; }
+
+  async function wsPick() {
+    const inp = document.getElementById('ws-root'); if (!inp) return;
+    toast('Открыл проводник — окно может оказаться позади конструктора', 'ok');
+    try {
+      const r = await fetch('api/pickdir', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                             body: JSON.stringify({ start: inp.value.trim() }) });
+      const d = await r.json().catch(() => ({}));
+      if (r.status === 501) return toast(d.hint || 'нативный диалог недоступен — жми «Обзор»', 'warn');
+      if (!r.ok) return toast('Диалог не открылся: ' + (d.error || r.status), 'err');
+      if (d.cancelled) return;
+      inp.value = d.path;
+      const p = loadPaths(); p.root = d.path; savePaths(p);
+      toast('Корень сборок: ' + d.path, 'ok');
+    } catch (e) { toast('Движок не отвечает: ' + e.message, 'err'); }
+  }
+
+  /* Обзор деревом — запасной путь для Docker и удалённого движка, где нативного
+     диалога нет. Пустой путь: на Windows движок отдаёт список дисков. */
+  async function wsBrowse(path) {
+    const box = document.getElementById('ws-tree'); if (!box) return;
+    box.hidden = false;
+    box.innerHTML = '<div class="micro dim">читаю…</div>';
+    const q = (path == null) ? wsRootField() : path;
+    try {
+      const r = await fetch('api/fs?path=' + encodeURIComponent(q));
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { box.innerHTML = `<div class="micro warn">${esc(d.error || 'папка не открылась')}</div>`; return; }
+      box.innerHTML =
+        `<div class="ws-bar"><b>${esc(d.path || 'этот компьютер')}</b>
+           ${d.parent ? `<button class="tb" data-act="ws-go" data-path="${esc(d.parent)}">↑ вверх</button>` : ''}
+           ${d.path ? `<button class="tb primary" data-act="ws-here" data-path="${esc(d.path)}">выбрать эту</button>` : ''}
+           <button class="tb" data-act="ws-close">✕</button></div>` +
+        (d.dirs.length
+          ? d.dirs.map(x => `<button class="ws-dir" data-act="ws-go" data-path="${esc(x.path)}">${esc(x.name)}</button>`).join('')
+          : '<div class="micro dim">вложенных папок нет</div>');
+    } catch (e) { box.innerHTML = '<div class="micro warn">движок не отвечает</div>'; }
+  }
+
+  /* Разложить проекты по папкам. Существующие узнаются движком (метка, затем имя),
+     недостающие создаются. Итог пишем каждому проекту в meta.workdir — оттуда его
+     забирает задание на блок. */
+  async function wsSync() {
+    const root = wsRootField();
+    if (!root) return toast('Сначала выбери корень сборок', 'warn');
+    const p = loadPaths(); p.root = root; savePaths(p);
+    saveNow();                                   // текущий проект на диск: дальше правим чужие копии
+    const projects = loadRegistry().map(x => ({ id: x.id, name: x.name }));
+    try {
+      const r = await fetch('api/workspace', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                               body: JSON.stringify({ root, projects }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) return toast('Не разложилось: ' + (d.error || r.status), 'err');
+      let n = 0;
+      Object.keys(d.map || {}).forEach(pid => {
+        const dir = d.map[pid]; if (!dir) return;
+        if (pid === projectId) {
+          const meta = window.Graph.state.meta = window.Graph.state.meta || {};
+          if (meta.workdir !== dir) { meta.workdir = dir; n++; }
+          return;
+        }
+        try {
+          const raw = localStorage.getItem(LS_PROJECT + pid); if (!raw) return;
+          const o = JSON.parse(raw); o.meta = o.meta || {};
+          if (o.meta.workdir === dir) return;
+          o.meta.workdir = dir;
+          const s = JSON.stringify(o);
+          localStorage.setItem(LS_PROJECT + pid, s); diskPut(pid, s); n++;
+        } catch (e) {}
+      });
+      commit(); refresh();
+      wsLast = { created: (d.created || []).length, adopted: (d.adopted || []).length,
+                 failed: d.failed || [], map: d.map || {} };
+      renderWsInfo();
+      toast(`Папок создано: ${wsLast.created}, узнано: ${wsLast.adopted}, прописано проектам: ${n}`,
+            wsLast.failed.length ? 'warn' : 'ok');
+    } catch (e) { toast('Движок не отвечает: ' + e.message, 'err'); }
+  }
+
+  function renderWsInfo() {
+    const el = document.getElementById('ws-info'); if (!el) return;
+    if (!wsLast) {
+      el.innerHTML = 'Существующие папки движок узнаёт сам — по метке <code>.bench-project.json</code>, ' +
+                     'а если её нет, по имени. Недостающие создаёт. Итоговая папка уходит в задание на блок: ' +
+                     'исполнитель пишет только в неё.';
+      return;
+    }
+    const rows = Object.keys(wsLast.map).map(pid =>
+      `<div class="ws-map"><span>${esc(projectNameOf(pid) || pid)}</span><i>${esc(wsLast.map[pid] || '—')}</i></div>`).join('');
+    el.innerHTML = `создано ${wsLast.created} · узнано ${wsLast.adopted}` +
+      (wsLast.failed.length ? ` · <b class="warn">не вышло ${wsLast.failed.length}</b>` : '') + rows;
+  }
 
   /* ── мост «приложение → конструктор» (Cursor/Claude/Antigravity через MCP) ──
      Приложение кладёт операции правки на движок (/bridge/ops), браузер их
@@ -791,18 +926,52 @@ window.App = (function () {
     const list = item.build.filter(r => r && r.id);
     return list.length ? list : null;
   }
+  /* Пути из отчёта обязаны лежать внутри папки проекта. Исполнитель работает
+     снаружи конструктора, и промах здесь значит, что код уехал в чужой проект
+     или в исходники самого инструмента. Отчёт всё равно принимаем — работа
+     сделана, терять её нельзя, — но промах называем вслух и пишем в журнал
+     узла, чтобы он не растворился в тосте. */
+  function strayFiles(files) {
+    const dir = String(((window.Graph.state.meta || {}).workdir) || '').trim();
+    const list = (Array.isArray(files) ? files : []).map(s => String(s).trim()).filter(Boolean);
+    const norm = s => s.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+    const isAbs = s => /^([a-zA-Z]:[\\/]|\/|\\\\)/.test(s);      // C:\…, /…, \\сервер\…
+    const root = norm(dir);
+    const stray = [], blind = [];
+    list.forEach(f => {
+      if (!isAbs(f)) {
+        // относительный путь трактуем от папки проекта — но вверх выходить нельзя
+        if (norm(f).split('/').indexOf('..') >= 0) stray.push(f);
+        return;
+      }
+      if (!root) return void blind.push(f);                      // папки нет — сравнивать не с чем
+      const p = norm(f);
+      if (p !== root && p.indexOf(root + '/') !== 0) stray.push(f);
+    });
+    return { stray, blind, dir };
+  }
+
   function applyBuildReports(list) {
-    const ok = [];
+    const ok = [], bad = [];
     list.forEach(r => {
       const id = resolveNodeId(String(r.id));
       if (!id) return void toast(`Отчёт мимо: блока «${r.id}» нет в плане`, 'warn');
+      const { stray, blind, dir } = strayFiles(r.files);
       window.Build.report(id, r);
+      if (stray.length) {
+        window.Build.note(id, `⚠ файлы вне папки проекта (${dir}): ${stray.join(', ')}`);
+        bad.push(`${(window.Graph.getNode(id) || {}).name || id}: ${stray.length}`);
+      } else if (blind.length) {
+        window.Build.note(id, 'Папка проекта не назначена — пути в отчёте проверить не с чем. ' +
+                              'Назначь её: ✦ ИИ → «Папка сборок».');
+      }
       bridgeTaskDone(id);
       ok.push((window.Graph.getNode(id) || {}).name || id);
     });
     if (!ok.length) return;
     window.Inspector.show([...window.Editor.selection]);   // открытая карточка должна показать новое состояние
-    toast(`Отчёт принят: ${ok.join(', ')}`, 'ok');
+    if (bad.length) toast(`Отчёт принят, но файлы вне папки проекта — ${bad.join('; ')}. Смотри журнал блока.`, 'warn');
+    else toast(`Отчёт принят: ${ok.join(', ')}`, 'ok');
   }
 
   async function bridgePoll() {
@@ -994,7 +1163,18 @@ window.App = (function () {
       <pre class="mcp-cfg" id="mcp-cfg-view"></pre>
       <pre class="mcp-cfg" id="mcp-server-view" hidden></pre>
     </div>`;
-    document.getElementById('guide-models').innerHTML = modelsHTML + proxyBlock + bridgeBlock;
+    const wsBlock = `<div class="gmodel"><div class="gmodel-h">Папка сборок · где проекты превращаются в код</div>
+      <div class="gfld wide"><label>Корень — одна папка на все проекты, внутри по папке на каждый</label>
+        <input id="ws-root" type="text" value="${esc(loadPaths().root || '')}" placeholder="C:\\Users\\…\\Projects" spellcheck="false"></div>
+      <div class="mcp-apps">
+        <button class="tb" data-act="ws-pick" title="Нативный проводник — открывает движок">Выбрать…</button>
+        <button class="tb" data-act="ws-browse" title="Обзор деревом — работает и в Docker, и на удалённом движке">Обзор</button>
+        <button class="tb primary" data-act="ws-sync" title="Узнать существующие папки и создать недостающие">Разложить проекты</button>
+      </div>
+      <div class="ws-tree" id="ws-tree" hidden></div>
+      <div class="micro dim" id="ws-info"></div></div>`;
+    document.getElementById('guide-models').innerHTML = modelsHTML + wsBlock + proxyBlock + bridgeBlock;
+    renderWsInfo();
     updateMcpView();
     const mp = document.getElementById('mcp-path');
     if (mp) mp.addEventListener('input', () => { const p = loadProxy(); p.mcpPath = mp.value; saveProxy(p); updateMcpView(); });
@@ -1055,6 +1235,7 @@ window.App = (function () {
     // 1) поля модели → в план (секрет пропускаем)
     document.querySelectorAll('#guide-models [data-ref]').forEach(el => {
       if (el.dataset.key === '__secret') return;
+      if (!el.dataset.key) return;        // список моделей провайдера: помечен ref, но полем плана не является
       const m = models[el.dataset.ref] = models[el.dataset.ref] || {};
       let v = el.value;
       if (typeof v === 'string') v = v.trim();
@@ -1063,6 +1244,8 @@ window.App = (function () {
       if (v === '' || v === undefined) delete m[el.dataset.key];
       else m[el.dataset.key] = v;
     });
+    // мусор от прежней версии: значение из списка моделей писалось в ключ «undefined»
+    ['primary', 'heavy'].forEach(r => { if (models[r]) delete models[r]['undefined']; });
     // 2) значения ключей → в локальное хранилище, по имени env-переменной (не в план)
     const secrets = loadSecrets();
     let stray = false;
@@ -1074,7 +1257,11 @@ window.App = (function () {
     saveSecrets(secrets);
     // 3) то же — в подключение ПО УМОЛЧАНИЮ: новые проекты подхватят его сами
     const gl = loadGlobalModels();
-    ['primary', 'heavy'].forEach(ref => { if (models[ref]) gl[ref] = Object.assign({}, gl[ref], models[ref]); });
+    ['primary', 'heavy'].forEach(ref => {
+      if (!models[ref]) return;
+      gl[ref] = Object.assign({}, gl[ref], models[ref]);
+      delete gl[ref]['undefined'];      // тот же мусор мог осесть и в дефолте — слияние его тянуло обратно
+    });
     saveGlobalModels(gl);
     const pon = document.getElementById('proxy-on'), pur = document.getElementById('proxy-url'), bon = document.getElementById('bridge-on'), mpath = document.getElementById('mcp-path');
     if (pon && pur) saveProxy({ on: pon.checked, url: pur.value.trim(), bridge: bon ? bon.checked : !!loadProxy().bridge, mcpPath: mpath ? mpath.value.trim() : loadProxy().mcpPath });
@@ -1091,7 +1278,7 @@ window.App = (function () {
     const cats = {};
     for (const [t, d] of Object.entries(window.BLOCKS.TYPES)) (cats[d.category] = cats[d.category] || []).push(t);
     const rules = [
-      'Ты дорабатываешь ПЛАН ПРОЕКТА в конструкторе Workbench. План = граф: узел=шаг (params — ТЗ шага), ребро=связь.',
+      'Ты дорабатываешь ПЛАН ПРОЕКТА в конструкторе Bench. План = граф: узел=шаг (params — ТЗ шага), ребро=связь.',
       'ПОРТЫ: kind flow (порядок выполнения) либо data (знания/контекст). Ребро соединяет ТОЛЬКО одинаковые kind; from=выход, to=вход. Входы с multi берут несколько рёбер. У choice/direction по порту на пункт; у agent порт graph при graph_in:true.',
       'СХЕМА: узел {id,type,name,x,y,enabled,notes,params}; ребро {id,from:{node,port},to:{node,port},kind:"flow"|"data"}.',
       'ПРАВКА: меняй минимум, верни ВЕСЬ план ОДНИМ минифицированным JSON (без красивого форматирования, без прозы). id держи стабильными; новый узел id="<type>_<n>"; подними meta.rev +1. x/y любые — человек нажмёт авто-раскладку.',
@@ -1383,8 +1570,14 @@ window.App = (function () {
 
     return [
       `# ЗАДАНИЕ · проект «${G.state.name}» (${projectId}) · блок ${n.id}`,
-      'Ты пишешь код по плану из конструктора Workbench. Строим ОДИН блок — соседей не трогаем:',
+      'Ты пишешь код по плану из конструктора Bench. Строим ОДИН блок — соседей не трогаем:',
       'их границы описаны ниже как контракты, и менять их без правки плана нельзя.',
+      '',
+      /* Без явной папки исполнитель пишет туда, где сам оказался, и проекты
+         перемешиваются. Папка назначается в дашборде: ✦ ИИ → «Папка сборок». */
+      (G.state.meta || {}).workdir
+        ? `## ГДЕ СТРОИТЬ\nПапка проекта: ${G.state.meta.workdir}\nВсе файлы — внутри неё. За её пределы не выходим.`
+        : '## ГДЕ СТРОИТЬ\n⚠ Папка проекта не задана. Спроси человека, куда писать: ✦ ИИ → «Папка сборок».',
       '',
       '## ЧТО ПОСТРОИТЬ',
       `${n.id} · тип ${n.type} (${T.label || '?'})${n.enabled === false ? ' · ВЫКЛЮЧЕН В ПЛАНЕ' : ''}`,
@@ -1441,7 +1634,7 @@ window.App = (function () {
           dr.deps.map(id => '«' + ((G.getNode(id) || {}).name || id) + '»').join(', ') : '') +
         '\nПрежняя работа по этому блоку сделана по старой редакции — сверь её с описанием выше.\n' : null,
       '## КАК ОТЧИТАТЬСЯ',
-      'Инструментом MCP конструктора Workbench:',
+      'Инструментом MCP конструктора Bench:',
       `  report_build(id="${n.id}", status="done"|"failed"|"wip", files=["путь", …], checks="команды, по одной в строке",`,
       `               checks_ok=true|false, checks_out="хвост вывода, если красные", note="что сделал", spec_rev="${rev}")`,
       `spec_rev — печать плана, по которому выдано задание (${rev}). Верни её как есть: по ней конструктор поймёт,`,
@@ -2088,14 +2281,20 @@ window.App = (function () {
     if (ops.layout) done.push('схема разложена');
     toast(`План обновлён: ${done.join(', ') || '—'} · rev ${meta.rev}` + (warn.length ? ` · пропущено ${warn.length}` : ''), warn.length ? 'warn' : 'ok');
     let told = false;
-    /* Сообщаем модели настоящие id созданных блоков и запоминаем соответствие:
-       иначе следующая правка придёт по её временным именам и не найдёт ничего. */
-    if (!silent && Object.keys(alias).length) {
+    /* Соответствие «временное имя → настоящий id» запоминаем ВСЕГДА, и в молчаливом
+       применении тоже. Приложение по мосту шлёт операции раздельными посылками
+       (add_block отдельно, connect отдельно), и до этой записи псевдонимы жили
+       только внутри одного вызова: к моменту connect имена уже никому ни о чём не
+       говорили, и связи молча терялись все до единой.
+       В чат рассказываем по-прежнему только при интерактивной правке. */
+    if (Object.keys(alias).length) {
       const store = loadAliases(); Object.assign(store, alias); saveAliases(store);
-      chatHistory.push({ role: 'ctx', label: `созданы блоки: ${Object.keys(alias).length}`,
-        content: 'Настоящие id созданных блоков — дальше в patch/edges/del используй ИХ:\n' +
-          Object.keys(alias).map(t => `${t} → ${alias[t]}`).join('\n') });
-      told = true;
+      if (!silent) {
+        chatHistory.push({ role: 'ctx', label: `созданы блоки: ${Object.keys(alias).length}`,
+          content: 'Настоящие id созданных блоков — дальше в patch/edges/del используй ИХ:\n' +
+            Object.keys(alias).map(t => `${t} → ${alias[t]}`).join('\n') });
+        told = true;
+      }
     }
     // отчёт о пропусках уходит и человеку (жёлтая строка), и модели — следующим сообщением исправится
     if (!silent && warn.length) {
@@ -2241,6 +2440,7 @@ window.App = (function () {
       const env = e.target.closest('[data-env]');
       if (env) return toggleEnv(env.dataset.env);
       const b = e.target.closest('[data-act]'); if (!b) return;
+      if (b.dataset.act === 'unit-toggle') return toggleUnit();
       const r = document.getElementById('stage').getBoundingClientRect();
       const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
       if (b.dataset.act === 'zoom-in') window.Editor.zoomAt(cx, cy, 1.2);
@@ -2287,7 +2487,8 @@ window.App = (function () {
     window.Harness.setDetail(loadLayout().hDetail !== false);   // плотность жгута — тоже
     const env = loadLayout().hEnv;
     if (env) window.Harness.ENVS.forEach(e => { if (e in env) window.Harness.setEnvShow(e, env[e]); });
-    syncDetailBtn(); renderEnvBox();
+    window.Harness.setUnitShow(loadLayout().hUnit === true);   // контуры сервисов — по умолчанию off
+    syncDetailBtn(); renderEnvBox(); renderUnitBox();
     applyPalMin(loadLayout().palMin);
     applyInspMin(loadLayout().inspMin);
     applyBridgeState();   // возобновить сопряжение с приложениями, если было включено
@@ -2310,6 +2511,17 @@ window.App = (function () {
       else if (a === 'close-drawers') closePalette();
       else if (a === 'close-guide') closeGuide();
       else if (a === 'guide-save-models') saveGuideModels();
+      else if (a === 'ws-pick') wsPick();
+      else if (a === 'ws-sync') wsSync();
+      else if (a === 'ws-browse') wsBrowse();
+      else if (a === 'ws-go') wsBrowse(b.dataset.path);
+      else if (a === 'ws-close') { const t = document.getElementById('ws-tree'); if (t) t.hidden = true; }
+      else if (a === 'ws-here') {
+        const inp = document.getElementById('ws-root');
+        if (inp) { inp.value = b.dataset.path; const p = loadPaths(); p.root = inp.value; savePaths(p); }
+        const t = document.getElementById('ws-tree'); if (t) t.hidden = true;
+        toast('Корень сборок: ' + b.dataset.path, 'ok');
+      }
       else if (a === 'guide-apply-all') applyModelsToAllProjects();
       else if (a === 'guide-copy-brief') copyBrief();
       else if (a === 'toggle-secret') {

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""serve.py — единый запуск Workbench: статика + сохранение планов + прокси движка.
+"""serve.py — единый запуск Bench: статика + сохранение планов + прокси движка.
 
 Поднимает статический сервер конструктора (порт TESTER_PORT, по умолчанию 8791),
 принимает автосохранение планов на диск (папка projects/, эндпоинты /api/*) и
@@ -26,8 +26,11 @@ import re
 import sys
 import json
 import uuid
+import string
 import functools
 import threading
+import subprocess
+import urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 import chat_proxy   # лежит в той же папке
@@ -71,6 +74,78 @@ def _project_path(pid):
 def _build_path(pid):
     # точка в id запрещена регуляркой, поэтому planом нельзя перезаписать стройку и наоборот
     return _safe_path(pid, BUILD_SUFFIX)
+
+
+MARKER = ".bench-project.json"     # метка в папке сборки: чья она
+
+
+def _slug(name):
+    """Имя проекта -> имя папки. Кириллицу оставляем: Windows и Linux её держат,
+       а человеку читать свои же папки. Режем только то, что ломает путь."""
+    out = []
+    for ch in (name or "").strip():
+        if ch in '\\/:*?"<>|':
+            continue
+        out.append("-" if ch in " \t" else ch)
+    s = "".join(out).strip(" .-")[:64] or "proekt"
+    return "_" + s if s.upper() in WIN_RESERVED else s
+
+
+def _is_dir(path):
+    return bool(path) and os.path.isdir(path)
+
+
+def _inside(root, path):
+    """path лежит внутри root (или сам root). Пишем только туда, что человек выбрал."""
+    try:
+        r = os.path.abspath(root)
+        p = os.path.abspath(path)
+        return p == r or p.startswith(r + os.sep)
+    except (OSError, ValueError):
+        return False
+
+
+def _read_marker(folder):
+    try:
+        with open(os.path.join(folder, MARKER), "r", encoding="utf-8") as f:
+            got = json.load(f)
+        return got.get("project_id") if isinstance(got, dict) else None
+    except (OSError, ValueError):
+        return None
+
+
+def _pick_dir_native(start):
+    """Нативный проводник. Отдельным процессом, а не в потоке сервера: tkinter
+       в рабочем потоке ведёт себя непредсказуемо, а упавший диалог не должен
+       уронить движок. Нет графической сессии (Docker, ssh) — честно говорим."""
+    code = (
+        "import sys\n"
+        "try:\n"
+        "    import tkinter as tk\n"
+        "    from tkinter import filedialog\n"
+        "except Exception:\n"
+        "    print('@@NOGUI@@'); sys.exit(0)\n"
+        "try:\n"
+        "    r = tk.Tk(); r.withdraw(); r.attributes('-topmost', True)\n"
+        "    p = filedialog.askdirectory(title='Папка, в которой будут собираться проекты',\n"
+        "                                initialdir=sys.argv[1] or None, mustexist=False)\n"
+        "    r.destroy()\n"
+        "except Exception:\n"
+        "    print('@@NOGUI@@'); sys.exit(0)\n"
+        "print('@@PATH@@' + (p or ''))\n"
+    )
+    try:
+        res = subprocess.run([sys.executable, "-c", code, start or ""],
+                             capture_output=True, text=True, timeout=300)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return None, "диалог не открылся: %s" % e
+    out = (res.stdout or "").strip().splitlines()
+    tail = out[-1] if out else ""
+    if tail.startswith("@@NOGUI@@"):
+        return None, "nogui"
+    if tail.startswith("@@PATH@@"):
+        return tail[len("@@PATH@@"):].strip(), None
+    return None, "диалог вернул неожиданное: %s" % (tail[:120] or "пусто")
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -175,7 +250,7 @@ class Handler(SimpleHTTPRequestHandler):
     def _save(self):
         self._put(_project_path(self._tail("/api/project/")),
                   lambda d: isinstance(d, dict) and isinstance(d.get("nodes"), list),
-                  "не похоже на план Workbench (нет массива nodes)")
+                  "не похоже на план Bench (нет массива nodes)")
 
     def _save_build(self):
         # у стройки nodes — объект (id узла → запись), у плана массив: перепутать нельзя
@@ -197,10 +272,136 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(500, {"error": "не удалилось: %s" % e})
         self._json(200, {"ok": True})
 
+    # ── папка сборок: где проекты превращаются в код ────────────────────────
+    def _body(self, limit=1 << 20):
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            return None
+        if n <= 0 or n > limit:
+            return None
+        try:
+            return json.loads(self.rfile.read(n).decode("utf-8"))
+        except (OSError, ValueError, UnicodeDecodeError):
+            return None
+
+    def _q(self, key):
+        got = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get(key)
+        return (got or [""])[0]
+
+    def _fs(self):
+        """Обзор дерева для выбора корня. Пустой путь: на Windows — список дисков,
+           иначе — домашняя папка. Читаем только имена подпапок, файлы не отдаём."""
+        path = self._q("path")
+        if not path:
+            if os.name == "nt":
+                drives = ["%s:\\" % d for d in string.ascii_uppercase if os.path.exists("%s:\\" % d)]
+                return self._json(200, {"path": "", "parent": None,
+                                        "dirs": [{"name": d, "path": d} for d in drives]})
+            path = os.path.expanduser("~")
+        path = os.path.abspath(path)
+        if not _is_dir(path):
+            return self._json(404, {"error": "нет такой папки"})
+        try:
+            dirs = [{"name": n, "path": os.path.join(path, n)}
+                    for n in sorted(os.listdir(path), key=lambda s: s.lower())
+                    if not n.startswith(".") and os.path.isdir(os.path.join(path, n))]
+        except OSError as e:
+            return self._json(403, {"error": "папка не читается: %s" % e})
+        parent = os.path.dirname(path)
+        self._json(200, {"path": path, "parent": None if parent == path else parent, "dirs": dirs})
+
+    def _workspace(self):
+        """Что уже лежит в корне сборок и чьё оно (по метке в папке)."""
+        root = self._q("root")
+        if not _is_dir(root):
+            return self._json(404, {"error": "корень не найден", "root": root})
+        root = os.path.abspath(root)
+        try:
+            folders = [{"name": n, "path": os.path.join(root, n),
+                        "project_id": _read_marker(os.path.join(root, n))}
+                       for n in sorted(os.listdir(root), key=lambda s: s.lower())
+                       if not n.startswith(".") and os.path.isdir(os.path.join(root, n))]
+        except OSError as e:
+            return self._json(403, {"error": "корень не читается: %s" % e})
+        self._json(200, {"root": root, "folders": folders})
+
+    def _workspace_sync(self):
+        """Разложить проекты по папкам внутри корня: существующие узнать, недостающие
+           создать. Узнаём в два захода — сперва по метке (переживает переименование
+           проекта), потом по имени папки. Подобранной папке метку тоже ставим."""
+        data = self._body()
+        if not isinstance(data, dict):
+            return self._json(400, {"error": "ожидаю {root, projects:[{id,name}]}"})
+        root = data.get("root")
+        if not _is_dir(root):
+            return self._json(404, {"error": "корень не найден", "root": root})
+        root = os.path.abspath(root)
+        projects = [p for p in (data.get("projects") or [])
+                    if isinstance(p, dict) and p.get("id") and ID_RE.fullmatch(str(p["id"]))]
+        by_marker, by_name = {}, {}
+        try:
+            for n in os.listdir(root):
+                full = os.path.join(root, n)
+                if not os.path.isdir(full):
+                    continue
+                by_name[n.lower()] = full
+                pid = _read_marker(full)
+                if pid:
+                    by_marker[pid] = full
+        except OSError as e:
+            return self._json(403, {"error": "корень не читается: %s" % e})
+        mapping, created, adopted, failed = {}, [], [], []
+        for p in projects:
+            pid, nm = str(p["id"]), p.get("name") or ""
+            folder, fresh = by_marker.get(pid) or by_name.get(_slug(nm).lower()), False
+            if not folder:
+                folder = os.path.join(root, _slug(nm))
+                try:
+                    os.makedirs(folder, exist_ok=True)
+                    fresh = True
+                except OSError as e:
+                    failed.append({"id": pid, "error": str(e)})
+                    continue
+            if not _inside(root, folder):        # писать соглашаемся только внутрь выбранного корня
+                failed.append({"id": pid, "error": "папка вне корня"})
+                continue
+            try:
+                with open(os.path.join(folder, MARKER), "w", encoding="utf-8") as f:
+                    json.dump({"project_id": pid, "name": nm}, f, ensure_ascii=False, indent=2)
+            except OSError:
+                pass                              # метка — удобство, а не условие работы
+            mapping[pid] = folder
+            (created if fresh else adopted).append({"id": pid, "path": folder})
+        self._json(200, {"root": root, "map": mapping,
+                         "created": created, "adopted": adopted, "failed": failed})
+
+    def _pickdir(self):
+        path, err = _pick_dir_native((self._body() or {}).get("start") or "")
+        if err == "nogui":
+            return self._json(501, {"error": "nogui",
+                                    "hint": "у движка нет графической сессии — выбери папку обзором или впиши путь"})
+        if err:
+            return self._json(500, {"error": err})
+        self._json(200, {"path": path or "", "cancelled": not path})
+
     def do_GET(self):
-        if self.path.split("?", 1)[0] == "/api/state":
+        head = self.path.split("?", 1)[0]
+        if head == "/api/state":
             return self._state()
+        if head == "/api/fs":
+            return self._fs()
+        if head == "/api/workspace":
+            return self._workspace()
         return super().do_GET()
+
+    def do_POST(self):
+        head = self.path.split("?", 1)[0]
+        if head == "/api/workspace":
+            return self._workspace_sync()
+        if head == "/api/pickdir":
+            return self._pickdir()
+        self._json(404, {"error": "нет такого пути"})
 
     def do_PUT(self):
         if self.path.startswith("/api/project/"):
@@ -234,7 +435,7 @@ def main():
         httpd = ThreadingHTTPServer((BIND, PORT), handler)
     except OSError as e:
         print("Не удалось занять %s:%d — %s" % (BIND, PORT, e), file=sys.stderr)
-        print("Похоже, порт уже занят (другая копия Workbench?). Закройте её или задайте "
+        print("Похоже, порт уже занят (другая копия Bench?). Закройте её или задайте "
               "другой порт:  TESTER_PORT=8890 py serve.py", file=sys.stderr)
         sys.exit(1)
 
@@ -242,7 +443,7 @@ def main():
         print("ВНИМАНИЕ: сервер слушает %s — доступен из сети. Любой в этой сети сможет "
               "читать, менять и удалять ваши планы." % BIND, file=sys.stderr)
     shown = "localhost" if BIND in ("127.0.0.1", "localhost") else BIND
-    print("Workbench: http://%s:%d   (планы в %s/, + прокси движка на :%d)"
+    print("Bench: http://%s:%d   (планы в %s/, + прокси движка на :%d)"
           % (shown, PORT, os.path.basename(PROJECTS_DIR), chat_proxy.PORT))
     # авто-открыть браузер (для установщика/двойного клика); TESTER_OPEN=0 отключает
     if os.environ.get("TESTER_OPEN", "1") != "0":

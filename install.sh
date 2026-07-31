@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Workbench — установка на macOS/Linux: проверка Python + ярлык (Linux).
+# Bench — установка на macOS/Linux: проверка Python + ярлык (Linux).
 set -e
 dir="$(cd "$(dirname "$0")" && pwd)"
-echo "Workbench — установка"
+echo "Bench — установка"
 
 # 1) проверка Python 3
 if command -v python3 >/dev/null 2>&1; then PY=python3
@@ -24,7 +24,7 @@ if [ -d "$HOME/.local/share" ]; then
   cat > "$apps/workbench.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Workbench
+Name=Bench
 Comment=Конструктор конвейеров
 Exec=$PY "$dir/serve.py"
 Path=$dir

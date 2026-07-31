@@ -1,9 +1,9 @@
-# Workbench — установка на Windows: проверка Python + ярлык на рабочем столе.
+# Bench — установка на Windows: проверка Python + ярлык на рабочем столе.
 # Запуск:  правый клик → «Выполнить с помощью PowerShell», либо  py -3 -m ... ; либо:
 #          powershell -ExecutionPolicy Bypass -File install.ps1
 $ErrorActionPreference = 'Stop'
 $dir = $PSScriptRoot
-Write-Host "Workbench — установка" -ForegroundColor Cyan
+Write-Host "Bench — установка" -ForegroundColor Cyan
 
 # 1) проверка Python 3
 $py = $null
@@ -19,14 +19,14 @@ Write-Host "Найден Python $ver ($py)" -ForegroundColor Green
 # 2) ярлык на рабочем столе
 try {
   $desktop = [Environment]::GetFolderPath('Desktop')
-  $lnk = Join-Path $desktop 'Workbench.lnk'
+  $lnk = Join-Path $desktop 'Bench.lnk'
   $ws = New-Object -ComObject WScript.Shell
   $s = $ws.CreateShortcut($lnk)
   $s.TargetPath = (Get-Command $py).Source
   $s.Arguments = 'serve.py'
   $s.WorkingDirectory = $dir
   $s.IconLocation = "$env:SystemRoot\System32\shell32.dll,13"
-  $s.Description = 'Workbench — конструктор конвейеров'
+  $s.Description = 'Bench — конструктор конвейеров'
   $s.Save()
   Write-Host "Ярлык создан: $lnk" -ForegroundColor Green
 } catch {
@@ -34,6 +34,6 @@ try {
 }
 
 Write-Host ""
-Write-Host "Готово. Запуск: двойной клик по ярлыку «Workbench», либо run.bat, либо:" -ForegroundColor Green
+Write-Host "Готово. Запуск: двойной клик по ярлыку «Bench», либо run.bat, либо:" -ForegroundColor Green
 Write-Host "    $py serve.py"
 Write-Host "Откроется http://localhost:8791"

@@ -1,4 +1,4 @@
-# Установка Workbench
+# Установка Bench
 
 Три способа — выбирайте под себя. Приложению не нужны никакие зависимости, кроме
 Python 3 (а для `.exe` не нужен и он).
@@ -30,17 +30,17 @@ GitHub или `git clone`), распакуйте и:
 
 ## 2. Windows `.exe` (один клик, без Python)
 
-Готовый `Workbench.exe` лежит в разделе **Releases** репозитория (собирается
+Готовый `Bench.exe` лежит в разделе **Releases** репозитория (собирается
 автоматически из исходников через GitHub Actions).
 
-1. Скачайте `Workbench.exe`.
+1. Скачайте `Bench.exe`.
 2. Положите в любую папку и запустите двойным кликом.
 3. Откроется `http://localhost:8791`. Планы сохранятся в папку `projects\` рядом
    с `.exe`.
 
 Собрать `.exe` самостоятельно:
 ```powershell
-powershell -ExecutionPolicy Bypass -File build_exe.ps1   # → dist\Workbench.exe
+powershell -ExecutionPolicy Bypass -File build_exe.ps1   # → dist\Bench.exe
 ```
 
 ---

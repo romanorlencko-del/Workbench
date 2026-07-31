@@ -1,5 +1,5 @@
 @echo off
-rem Workbench — запуск двойным кликом. Нужен установленный Python 3.
+rem Bench — запуск двойным кликом. Нужен установленный Python 3.
 cd /d "%~dp0"
 where py >nul 2>nul
 if %errorlevel%==0 (

@@ -373,6 +373,66 @@ window.Harness = (function () {
     return out.join('');
   }
 
+  /* ── контуры сервисов (единицы развёртывания) ─────────
+     Другое сечение того же графа, чем среды: среда — ГДЕ выполняется узел
+     (клиент/сервер/внешнее), сервис — В КАКОМ контуре развёртывания он живёт
+     (поле unit). Показываем ОБВОДКОЙ, а не заливкой: заливка занята средами, и
+     обводка поверх неё читается отдельным словарём. Члены сервиса разбросаны по
+     шинам категорий — поэтому, как и у сред, рисуем рамку НА КАЖДЫЙ чип, а не
+     габаритную (та по разбросанным членам накрыла бы пол-схемы). */
+  const unitOf = n => { const u = ((n || {}).params || {}).unit; return (typeof u === 'string' && u.trim()) ? u.trim() : null; };
+  const UNIT_PALETTE = ['#2dd4bf', '#818cf8', '#f472b6', '#f5a524', '#38bdf8', '#a3e635', '#fb923c', '#c084fc'];
+  let unitShow = false;
+  /* Цвет сервису — по стабильному порядку имён, чтобы не мигал между рендерами. */
+  function unitColorMap() {
+    const names = [...new Set(window.Graph.state.nodes.map(unitOf).filter(Boolean))].sort();
+    const m = new Map();
+    names.forEach((u, i) => m.set(u, UNIT_PALETTE[i % UNIT_PALETTE.length]));
+    return m;
+  }
+  const U_PAD = 15, U_R = 13;
+  function unitContoursSVG() {
+    if (!unitShow) return '';
+    const cm = unitColorMap();
+    const groups = new Map();
+    window.Graph.state.nodes.forEach(n => {
+      const u = unitOf(n); if (!u) return;
+      const p = pos.get(n.id); if (!p) return;
+      if (!groups.has(u)) groups.set(u, []);
+      groups.get(u).push(p);
+    });
+    let out = '';
+    for (const [u, list] of groups) {
+      const c = cm.get(u);
+      const rects = list.map(p =>
+        `<rect x="${(p.x - U_PAD).toFixed(1)}" y="${(p.y - U_PAD).toFixed(1)}" width="${(p.w + U_PAD * 2).toFixed(1)}" height="${(p.h + U_PAD * 2).toFixed(1)}" rx="${U_R}"/>`).join('');
+      out += `<g class="hunit" stroke="${c}" fill="${c}">${rects}</g>`;
+    }
+    return out;
+  }
+  /* Ярлык сервиса — у его левого-верхнего члена, всегда (в отличие от среды: имя
+     сервиса на карточке не пишется, узнать цвет иначе неоткуда). */
+  function unitLabelsHTML() {
+    if (!unitShow) return '';
+    const cm = unitColorMap();
+    const first = new Map();     // сервис → самый левый-верхний член
+    window.Graph.state.nodes.forEach(n => {
+      const u = unitOf(n); if (!u) return;
+      const p = pos.get(n.id); if (!p) return;
+      const cur = first.get(u);
+      if (!cur || p.x < cur.x || (p.x === cur.x && p.y < cur.y)) first.set(u, p);
+    });
+    const out = [];
+    for (const [u, p] of first)
+      out.push(`<div class="hunit-label" style="left:${(p.x - U_PAD).toFixed(1)}px;top:${(p.y - U_PAD - 19).toFixed(1)}px;--uc:${cm.get(u)}">${esc(u)}</div>`);
+    return out.join('');
+  }
+  function unitNames() {
+    const cm = unitColorMap(), cnt = new Map();
+    window.Graph.state.nodes.forEach(n => { const u = unitOf(n); if (u) cnt.set(u, (cnt.get(u) || 0) + 1); });
+    return [...cm.keys()].map(u => ({ name: u, color: cm.get(u), count: cnt.get(u) || 0 }));
+  }
+
   /* ── отрисовка ──────────────────────────────────────── */
   /* Зона = полоса шины. Три слоя, как на архитектурных плакатах: утопленная
      поверхность (темнее фона) + едва заметный тон категории + одна рамка.
@@ -498,15 +558,15 @@ window.Harness = (function () {
       const el = $chips.querySelector(`.hchip[data-id="${n.id}"]`);
       if (el) { el.style.left = p.x + 'px'; el.style.top = p.y.toFixed(1) + 'px'; }
     });
-    $wires.innerHTML = zonesSVG() + busSVG() + wiresSVG(selection);
+    $wires.innerHTML = zonesSVG() + busSVG() + unitContoursSVG() + wiresSVG(selection);
   }
 
   function render(sel) {
     if (!els()) return;
     const selection = sel || new Set();
     layout();
-    $wires.innerHTML = zonesSVG() + busSVG() + wiresSVG(selection);
-    $chips.innerHTML = zoneLabelsHTML() + labelsHTML() + legendHTML() +
+    $wires.innerHTML = zonesSVG() + busSVG() + unitContoursSVG() + wiresSVG(selection);
+    $chips.innerHTML = zoneLabelsHTML() + unitLabelsHTML() + labelsHTML() + legendHTML() +
       window.Graph.state.nodes.map(n => chipHTML(n, selection)).join('');
   }
 
@@ -523,6 +583,10 @@ window.Harness = (function () {
     ENVS, envLabel: e => (ZONE[e] || {}).label || e, envColor: e => (ZONE[e] || {}).color || '#5d6a80',
     setEnvShow: (e, on) => { if (ZONE[e]) envShow[e] = !!on; },
     getEnvShow: () => Object.assign({}, envShow),
+    /* Контуры сервисов — второе сечение (единицы развёртывания), обводкой. */
+    setUnitShow: v => { unitShow = !!v; },
+    getUnitShow: () => unitShow,
+    unitNames,
     envCounts() {
       const out = { client: 0, server: 0, external: 0 };
       window.Graph.state.nodes.forEach(n => { const e = envOf(n); if (e && out[e] !== undefined) out[e]++; });

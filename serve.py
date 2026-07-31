@@ -26,8 +26,11 @@ import re
 import sys
 import json
 import uuid
+import time
+import socket
 import string
 import functools
+import collections
 import threading
 import subprocess
 import urllib.parse
@@ -77,6 +80,22 @@ def _build_path(pid):
 
 
 MARKER = ".bench-project.json"     # метка в папке сборки: чья она
+ERRORS = collections.deque(maxlen=50)   # последние отказы движка — доктору в браузер
+
+
+def _note_error(where, msg):
+    ERRORS.append("%s · %s: %s" % (time.strftime("%H:%M:%S"), where, str(msg)[:300]))
+
+
+def _rev_of(plan):
+    """meta.rev как целое, иначе None. Булев True тоже число — его не берём."""
+    try:
+        r = (plan.get("meta") or {}).get("rev")
+    except AttributeError:
+        return None
+    if isinstance(r, bool) or not isinstance(r, (int, float)):
+        return None
+    return int(r)
 
 
 def _slug(name):
@@ -154,6 +173,8 @@ class Handler(SimpleHTTPRequestHandler):
     timeout = 30   # зависшее соединение не держит поток вечно
 
     def _json(self, code, obj):
+        if code >= 400:      # свои же отказы копим для доктора, а не только отвечаем ими
+            _note_error(self.path.split("?", 1)[0], (obj or {}).get("error") or code)
         body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -233,6 +254,20 @@ class Handler(SimpleHTTPRequestHandler):
                     return self._json(409, {"error": "на диске более свежая версия",
                                             "mtime": fresh[1], "data": fresh[0]})
                 # свежую прочитать не смогли — падаем в обычную запись
+        # Второй рубеж — РЕВИЗИЯ. Метка времени защищает лишь того, кто файл уже
+        # видел: вкладка со старой копией в localStorage приходит с ВЕРНОЙ меткой
+        # (её проставил подхват при загрузке) и честно затирает более новый план.
+        # Ревизия назад не ходит — поэтому откат ловится и там, где метка совпала.
+        rev = _rev_of(data)
+        if rev is not None and os.path.exists(path):
+            fresh = self._read_json(path)
+            disk_rev = _rev_of(fresh[0]) if fresh else None
+            if disk_rev is not None and disk_rev > rev:
+                _note_error("откат плана отбит", "%s: ревизия %s < %s на диске"
+                            % (os.path.basename(path), rev, disk_rev))
+                return self._json(409, {"error": "на диске более поздняя ревизия плана: %s (у вас %s)"
+                                                 % (disk_rev, rev),
+                                        "mtime": fresh[1], "data": fresh[0]})
         os.makedirs(PROJECTS_DIR, exist_ok=True)
         tmp = "%s.%s.tmp" % (path, uuid.uuid4().hex)   # уникальный tmp: две вкладки не бьют друг друга
         try:
@@ -385,10 +420,52 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(500, {"error": err})
         self._json(200, {"path": path or "", "cancelled": not path})
 
+    def _doctor(self):
+        """Сводка о движке для доктора в браузере: пишется ли диск, жив ли прокси,
+           что на мосту и на что движок ругался. Раньше всё это жило в stderr
+           того окна, где запущен движок, и до человека не доходило."""
+        writable, probe = False, os.path.join(PROJECTS_DIR, ".write-probe")
+        try:
+            os.makedirs(PROJECTS_DIR, exist_ok=True)
+            with open(probe, "w", encoding="utf-8") as f:
+                f.write("ok")
+            os.remove(probe)
+            writable = True
+        except OSError as e:
+            _note_error("папка планов", e)
+        try:
+            count = len([n for n in os.listdir(PROJECTS_DIR)
+                         if n.endswith(".json") and not n.endswith(BUILD_SUFFIX)])
+        except OSError:
+            count = 0
+        # живость прокси меряем сокетом, а не состоянием модуля: поток мог умереть,
+        # а переменные остаться на месте и врать, что всё хорошо
+        alive = False
+        try:
+            with socket.create_connection(("127.0.0.1", chat_proxy.PORT), 0.4):
+                alive = True
+        except OSError:
+            pass
+        try:
+            bridge = chat_proxy.bridge_stats()
+        except Exception as e:                      # noqa: BLE001 — доктор не должен падать сам
+            bridge = {"error": str(e)}
+        self._json(200, {
+            "ok": True,
+            "python": sys.version.split()[0],
+            "platform": sys.platform,
+            "projects": {"dir": PROJECTS_DIR, "writable": writable, "count": count},
+            "proxy": {"port": chat_proxy.PORT, "alive": alive},
+            "bridge": bridge,
+            "errors": list(ERRORS),
+        })
+
     def do_GET(self):
         head = self.path.split("?", 1)[0]
         if head == "/api/state":
             return self._state()
+        if head == "/api/doctor":
+            return self._doctor()
         if head == "/api/fs":
             return self._fs()
         if head == "/api/workspace":

@@ -60,6 +60,16 @@ _bridge_lock = threading.Lock()
 _bridge_ops = []                 # очередь операций: приложение → браузер
 _bridge_plan = {"json": None, "project": None}   # последний план + чей он
 _bridge_tasks = {}               # выданные задания: id блока → задание (порядок выдачи)
+_bridge_warns = []               # промахи применения: браузер → приложение (обратный канал)
+_WARN_MAX = 50
+
+
+def bridge_stats():
+    """Сводка для доктора: движок спрашивает её у себя же, в одном процессе."""
+    with _bridge_lock:
+        return {"pending": len(_bridge_ops), "tasks": len(_bridge_tasks),
+                "warns": len(_bridge_warns), "project": _pid(_bridge_plan["project"]),
+                "has_plan": _bridge_plan["json"] is not None}
 
 
 def _pid(v):
@@ -187,6 +197,13 @@ class Proxy(BaseHTTPRequestHandler):
                 tasks = [t for t in _bridge_tasks.values()
                          if not cur or not _pid(t.get("project")) or _pid(t.get("project")) == cur]
             return self._json(200, {"tasks": tasks, "project": project})
+        if self.path.startswith("/bridge/warn"):
+            # отдаём и вычищаем: приложение должно услышать промах один раз,
+            # иначе одна и та же жалоба висела бы в каждом ответе до конца сессии
+            with _bridge_lock:
+                items = _bridge_warns[:]
+                del _bridge_warns[:]
+            return self._json(200, {"warns": items})
         self._json(404, {"error": "unknown bridge route", "path": self.path})
 
     def _bridge_post(self):
@@ -242,6 +259,19 @@ class Proxy(BaseHTTPRequestHandler):
                 else:
                     _bridge_plan["json"] = body
             return self._json(200, {"ok": True})
+        if self.path.startswith("/bridge/warn"):
+            # браузер сообщает, что из присланного НЕ встало: без этого канала
+            # приложение всегда слышало «операции отправлены» и считало дело сделанным
+            items = body.get("items") if isinstance(body, dict) else None
+            if not isinstance(items, list):
+                return self._json(400, {"error": "нужен {project, items:[...]}"})
+            stamp = {"project": (body.get("project") if isinstance(body, dict) else None),
+                     "items": [str(x)[:300] for x in items[:20]]}
+            with _bridge_lock:
+                _bridge_warns.append(stamp)
+                del _bridge_warns[:-_WARN_MAX]
+                left = len(_bridge_warns)
+            return self._json(200, {"ok": True, "pending": left})
         if self.path.startswith("/bridge/task"):
             if not isinstance(body, dict) or not body.get("id"):
                 return self._json(400, {"error": "нужен объект задания с id блока"})

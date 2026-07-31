@@ -64,12 +64,31 @@ def _remember(project):
     return _state["project"]
 
 
+def _warns_text():
+    """Промахи применения, о которых сообщил браузер. Конструктор применяет правки
+       асинхронно (опрос ~1.5 с), поэтому в ответ на саму отправку сказать нечего —
+       зато промах прошлой пачки цепляем к ближайшему ответу. Без этого канала
+       инструмент всегда слышал «отправлено» и считал дело сделанным."""
+    try:
+        res = _engine("GET", "/bridge/warn") or {}
+    except Exception:
+        return ""
+    items = []
+    for w in (res.get("warns") or []):
+        items.extend(w.get("items") or [])
+    if not items:
+        return ""
+    return ("\n\nВНИМАНИЕ: предыдущая правка встала НЕ ПОЛНОСТЬЮ:\n- "
+            + "\n- ".join(str(x) for x in items[:20])
+            + "\nПеречитай план (get_plan) и почини эти места.")
+
+
 def _push_ops(ops):
     body = dict(ops)
     if _state["project"]:
         body["project"] = _state["project"]
     res = _engine("POST", "/bridge/ops", body)
-    return "операции отправлены в конструктор (в очереди: %s)" % res.get("pending", "?")
+    return ("операции отправлены в конструктор (в очереди: %s)" % res.get("pending", "?")) + _warns_text()
 
 
 def _digest_plan(plan, project=None):
@@ -240,7 +259,7 @@ def call_tool(name, args):
     if name == "get_plan":
         res = _engine("GET", "/bridge/plan")
         _remember(res.get("project"))
-        return _digest_plan(res.get("plan"), res.get("project"))
+        return _digest_plan(res.get("plan"), res.get("project")) + _warns_text()
     if name == "add_block":
         if not args.get("type"):
             return "нужен type блока"

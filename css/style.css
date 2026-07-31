@@ -1041,3 +1041,24 @@ textarea.code.bad{border-color:var(--err);box-shadow:0 0 0 3px rgba(248,113,113,
 .ws-dir::before{content:'▸ ';opacity:.5}
 .ws-map{display:flex;gap:8px;justify-content:space-between;padding:2px 0;border-top:1px dashed var(--line);margin-top:4px}
 .ws-map i{font-style:normal;opacity:.75;word-break:break-all;text-align:right}
+
+/* ── доктор: проверки окружения и журнал происшествий ─────────────────── */
+.doc-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 10px;border-bottom:1px solid var(--line)}
+.doc-checks{padding:6px 10px}
+.doc-row{display:flex;gap:10px;align-items:baseline;padding:4px 0;border-bottom:1px dashed var(--line)}
+.doc-row b{font-weight:600;font-size:13px}
+.doc-row i{font-style:normal;opacity:.7;font-size:12px}
+.doc-row::before{content:'·';width:14px;flex:none;text-align:center;font-weight:700;opacity:.6}
+.doc-row.ok::before{content:'✓';color:#34d399;opacity:1}
+.doc-row.warn::before{content:'!';color:#fbbf24;opacity:1}
+.doc-row.crit::before{content:'✕';color:#f87171;opacity:1}
+.doc-log-h{padding:8px 10px 2px}
+.doc-log{padding:0 10px 10px;font-size:12px;font-family:ui-monospace,Consolas,monospace}
+.doc-line{display:flex;gap:8px;padding:2px 0;border-bottom:1px solid color-mix(in oklab,var(--line) 50%,transparent)}
+.doc-line .doc-ts{opacity:.5;flex:none}
+.doc-line .doc-where{opacity:.8;flex:none;min-width:70px}
+.doc-line .doc-msg{flex:1;word-break:break-word}
+.doc-line .doc-det{opacity:.55;flex:none;max-width:38%;text-align:right;word-break:break-all}
+.doc-line.error .doc-msg,.doc-line.net .doc-msg{color:#f87171}
+.doc-line.warn .doc-msg{color:#fbbf24}
+.pill.bad{background:#f87171;color:#111}

@@ -80,7 +80,9 @@ window.App = (function () {
           if (r.status === 409) return r.json().then(d => reconcileDisk(id, d)).catch(() => {});
           if (r.ok) return r.json().then(d => { if (d && d.mtime) diskMtime[id] = d.mtime; }).catch(() => {});
         })
-        .catch(() => {});                // движок выключен / оффлайн — не шумим
+        /* Тишина здесь была слишком полной: молча пропавшая запись выглядела как
+           «всё сохранилось». Тост по-прежнему не поднимаем — пишем доктору. */
+        .catch(e => { if (window.Doctor) window.Doctor.log('net', 'диск', 'план не записался: ' + e.message, id); });
     } catch (e) {}
   }
   /* Движок отбил запись: пока мы правили, план изменила другая вкладка или рука.
@@ -140,9 +142,23 @@ window.App = (function () {
           localStorage.setItem(LS_PROJECT + f.id, JSON.stringify(f.plan));
           const e = { id: f.id, name: f.plan.name || 'Без имени', updatedAt: diskMs };
           reg.push(e); byId.set(f.id, e); changed = true;
-        } else if (diskMs > (local.updatedAt || 0) + 2000) {   // на диске свежее — принять
-          localStorage.setItem(LS_PROJECT + f.id, JSON.stringify(f.plan));
-          local.name = f.plan.name || local.name; local.updatedAt = diskMs; changed = true;
+        } else {
+          /* Одного времени мало. Вкладка, простоявшая открытой, при своём автосейве
+             ставит updatedAt = сейчас, и её СТАРАЯ копия выглядит свежее диска, куда
+             другая вкладка уже записала доработанный план. Поэтому спрашиваем ещё и
+             ревизию: она назад не ходит, и более поздняя всегда побеждает. */
+          const revOf = p => { const r = p && p.meta ? Number(p.meta.rev) : NaN; return Number.isFinite(r) ? r : null; };
+          let localPlan = null;
+          try { localPlan = JSON.parse(localStorage.getItem(LS_PROJECT + f.id) || 'null'); } catch (e) {}
+          const dr = revOf(f.plan), lr = revOf(localPlan);
+          const revWins = dr !== null && lr !== null && dr > lr;
+          const timeWins = dr === null || lr === null ? diskMs > (local.updatedAt || 0) + 2000 : false;
+          if (revWins || timeWins) {
+            localStorage.setItem(LS_PROJECT + f.id, JSON.stringify(f.plan));
+            local.name = f.plan.name || local.name; local.updatedAt = diskMs; changed = true;
+            if (revWins && window.Doctor)
+              window.Doctor.log('info', 'диск', `взял версию с диска: ревизия ${dr} против ${lr} в этой вкладке`, f.id);
+          }
         }
       } catch (e) {}
     });
@@ -739,6 +755,60 @@ window.App = (function () {
     document.querySelectorAll('.ctab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
     document.querySelectorAll('.ctab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
     document.getElementById('app').classList.remove('console-collapsed');
+    if (tab === 'doctor') renderDoctor();          // проверки живые, кэшировать их незачем
+  }
+
+  /* ── доктор: ошибки инструмента и состояние окружения ──────────────────
+     Не путать с «Проверкой»: та про замысел (граф), доктор — про инструмент. */
+  function doctorContext() {
+    const meta = window.Graph.state.meta || {};
+    const secrets = loadSecrets();
+    return {
+      projectId, projectName: window.Graph.state.name,
+      workdir: meta.workdir || '',
+      bridgeOn: !!loadProxy().bridge,
+      models: ['primary', 'heavy'].map(ref => {
+        const m = resolveModel(ref);
+        return { ref, base_url: m.base_url || '', api_key_env: m.api_key_env || '',
+                 hasKey: !!(m.api_key_env && secrets[m.api_key_env]) };
+      }),
+    };
+  }
+
+  function renderDoctorBadge() {
+    const el = document.getElementById('doc-count'); if (!el || !window.Doctor) return;
+    const n = window.Doctor.count();
+    el.textContent = n ? String(n) : '';
+    el.classList.toggle('bad', !!n);
+  }
+
+  async function renderDoctor() {
+    const box = document.getElementById('tab-doctor'); if (!box || !window.Doctor) return;
+    const D = window.Doctor;
+    const bar = `<div class="doc-bar">
+        <button class="tb" data-act="doc-run">Проверить сейчас</button>
+        <button class="tb" data-act="doc-copy">Скопировать отчёт</button>
+        <button class="tb" data-act="doc-clear">Очистить журнал</button>
+        <span class="micro dim">инструмент и окружение · сам план проверяет вкладка «Проверка»</span>
+      </div>`;
+    box.innerHTML = bar + '<div class="micro dim">проверяю…</div>';
+    let res;
+    try { res = await D.checks(); }
+    catch (e) { res = [{ level: 'crit', title: 'проверки упали: ' + e.message, hint: '' }]; }
+    const all = D.entries(), list = all.slice(-60).reverse();
+    const when = ts => new Date(ts).toLocaleTimeString();
+    box.innerHTML = bar +
+      `<div class="doc-checks">${res.map(r =>
+        `<div class="doc-row ${r.level}"><b>${esc(r.title)}</b>${r.hint ? `<i>${esc(r.hint)}</i>` : ''}</div>`).join('')}</div>` +
+      `<div class="doc-log-h micro dim">журнал происшествий: ${all.length}</div>` +
+      (list.length
+        ? `<div class="doc-log">${list.map(r =>
+            `<div class="doc-line ${esc(r.kind)}"><span class="doc-ts">${when(r.ts)}</span>` +
+            `<span class="doc-where">${esc(r.where)}</span>` +
+            `<span class="doc-msg">${esc(r.msg)}${r.n ? ` ×${r.n}` : ''}</span>` +
+            (r.detail ? `<span class="doc-det">${esc(r.detail)}</span>` : '') + '</div>').join('')}</div>`
+        : '<div class="micro dim">пусто — ошибок не записано</div>');
+    renderDoctorBadge();
   }
 
   /* ── панель «ИИ-бриф»: инструкция, подключения API, копирование брифа ── */
@@ -894,6 +964,16 @@ window.App = (function () {
       body: JSON.stringify({ id, node: name, project: bridgeWho(), text }) }).catch(() => {});
     return true;
   }
+  /* Обратный канал моста: промахи молчаливого применения. Приложение через MCP
+     раньше всегда слышало «операции отправлены», даже когда не встало ничего —
+     теперь узнает об этом при следующем обращении к мосту. */
+  function bridgePushWarn(items) {
+    const base = bridgeBase(); if (!base || !loadProxy().bridge) return;
+    fetch(base + '/bridge/warn', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                   body: JSON.stringify({ project: bridgeWho(), items: items.slice(0, 20) }) })
+      .catch(e => { if (window.Doctor) window.Doctor.log('net', 'мост', 'предупреждение не ушло: ' + e.message); });
+  }
+
   function bridgeTaskDone(id) {
     const base = bridgeBase(); if (!base || !loadProxy().bridge) return;
     fetch(base + '/bridge/task', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -993,7 +1073,10 @@ window.App = (function () {
         });
         bridgePushPlan(!!applied);   // после правок — точно перешлём план; иначе только если сменился rev
       }
-    } catch (e) { /* движок не поднят — тихо ждём */ }
+    } catch (e) {
+      /* движок не поднят — экран не трогаем, но улику оставляем */
+      if (window.Doctor) window.Doctor.log('net', 'мост', 'опрос не прошёл: ' + e.message);
+    }
     finally { bridgeBusy = false; }
   }
   function applyBridgeState() {
@@ -1293,7 +1376,7 @@ window.App = (function () {
       'КАРКАС СБОРКИ: порядок flow-связей = порядок сборки; каждый узел — маленький проверяемый шаг, не забегай вперёд; data-рёбра говорят, что питает шаг.',
       'Числа настроек — 3 знака после точки.',
     ].join('\n');
-    return '# WORKBENCH — БРИФ ДЛЯ ИИ\n' + rules +
+    return '# BENCH — БРИФ ДЛЯ ИИ\n' + rules +
       '\n\n## ТЕКУЩИЙ ПЛАН (минифицированный JSON — верни план в этом же виде)\n' +
       JSON.stringify(window.Graph.toJSON());
   }
@@ -1832,7 +1915,7 @@ window.App = (function () {
 
   function buildChatSystem() {
     return [
-      '# WORKBENCH — ты дорабатываешь ПЛАН ПРОЕКТА (граф: узел = шаг, ребро = связь).',
+      '# BENCH — ты дорабатываешь ПЛАН ПРОЕКТА (граф: узел = шаг, ребро = связь).',
       'Ниже КАРТА плана — компактно: id, тип, имя, связи. Заметки и параметры блоков в ней НЕ показаны.',
       '',
       '## КАК ПОЛУЧИТЬ ДЕТАЛИ',
@@ -2296,11 +2379,18 @@ window.App = (function () {
         told = true;
       }
     }
-    // отчёт о пропусках уходит и человеку (жёлтая строка), и модели — следующим сообщением исправится
-    if (!silent && warn.length) {
-      chatHistory.push({ role: 'ctx', warn: true, label: `не применилось: ${warn.length} — можно исправить и прислать снова`,
-                         content: 'При применении пропущено:\n· ' + warn.slice(0, 10).join('\n· ') });
-      told = true;
+    /* Промахи применения. Раньше при молчаливом применении они пропадали совсем:
+       приложение через MCP всегда слышало «операции отправлены», даже когда не
+       встало ничего. Теперь их видит доктор, а через мост — и само приложение. */
+    if (warn.length) {
+      if (window.Doctor) window.Doctor.log('warn', silent ? 'мост' : 'чат',
+        `не применилось: ${warn.length}`, warn.slice(0, 6).join(' | '));
+      if (silent) bridgePushWarn(warn);
+      else {
+        chatHistory.push({ role: 'ctx', warn: true, label: `не применилось: ${warn.length} — можно исправить и прислать снова`,
+                           content: 'При применении пропущено:\n· ' + warn.slice(0, 10).join('\n· ') });
+        told = true;
+      }
     }
     if (told) { renderChat(); saveChat(); }
   }
@@ -2321,6 +2411,8 @@ window.App = (function () {
     window.Editor.init({ onChange: onGraphChange, onSelect: onSelectIds });
     /* стройка изменилась — перекрасить схему и пересчитать счётчик (план не трогаем) */
     window.Build.onChange(() => { window.Editor.render(); renderBuildCount(); renderQueue(); });
+    /* доктор должен видеть состояние приложения, а вкладка — счётчик ошибок */
+    if (window.Doctor) { window.Doctor.context(doctorContext); window.Doctor.onChange(renderDoctorBadge); renderDoctorBadge(); }
     window.Inspector.init({ onChange: () => {
       window.Graph.pruneEdges();          // порты могли исчезнуть после правки параметров
       commit(); window.Editor.render(); renderConsole();
@@ -2511,6 +2603,9 @@ window.App = (function () {
       else if (a === 'close-drawers') closePalette();
       else if (a === 'close-guide') closeGuide();
       else if (a === 'guide-save-models') saveGuideModels();
+      else if (a === 'doc-run') renderDoctor();
+      else if (a === 'doc-clear') { window.Doctor.clear(); renderDoctor(); }
+      else if (a === 'doc-copy') window.Doctor.report().then(t => copyText(t, 'Отчёт доктора в буфере'));
       else if (a === 'ws-pick') wsPick();
       else if (a === 'ws-sync') wsSync();
       else if (a === 'ws-browse') wsBrowse();

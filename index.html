@@ -133,6 +133,7 @@
       <button class="ctab active" data-tab="plan">Очередь выполнения</button>
       <button class="ctab" data-tab="check">Проверка <span id="check-count" class="pill"></span></button>
       <button class="ctab" data-tab="json">JSON</button>
+      <button class="ctab" data-tab="doctor" title="Ошибки инструмента и состояние окружения — не путать с «Проверкой» плана">Доктор <span id="doc-count" class="pill"></span></button>
       <div class="console-actions">
         <button class="tb icon" data-act="console-toggle" id="console-toggle" title="Свернуть">▾</button>
       </div>
@@ -141,6 +142,7 @@
       <div class="ctab-panel active" id="tab-plan"></div>
       <div class="ctab-panel" id="tab-check"></div>
       <div class="ctab-panel" id="tab-json"></div>
+      <div class="ctab-panel" id="tab-doctor"></div>
     </div>
   </footer>
 
@@ -210,7 +212,8 @@
 /* Грузим скрипты с меткой времени: без сборщика браузер иначе отдаёт старый js
    после правок. async=false сохраняет порядок выполнения. */
 ['js/blocks.js', 'js/example.js', 'js/pipeline.js', 'js/graph.js', 'js/build.js',
- 'js/collide.js', 'js/harness.js', 'js/editor.js', 'js/inspector.js', 'js/app.js'].forEach(src => {
+ 'js/collide.js', 'js/harness.js', 'js/editor.js', 'js/inspector.js', 'js/doctor.js',
+ 'js/app.js'].forEach(src => {
   const s = document.createElement('script');
   s.src = src + '?t=' + Date.now();
   s.async = false;

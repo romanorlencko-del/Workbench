@@ -230,6 +230,24 @@ window.App = (function () {
   /* ── консоль: высота чата (тянуть разделитель / верхнюю кромку) + сворачивание ── */
   function loadLayout() { try { return JSON.parse(localStorage.getItem('tester.layout') || '{}') || {}; } catch (e) { return {}; } }
   function saveLayout(o) { try { localStorage.setItem('tester.layout', JSON.stringify(o)); } catch (e) {} }
+
+  /* Подсказки по холсту: по умолчанию свёрнуты — они нужны на первых порах,
+     а полосу под холстом занимали постоянно. Выбор помним в той же раскладке. */
+  function applyHints() {
+    const box = document.getElementById('stage-hints');
+    const btn = document.getElementById('hints-toggle');
+    if (!box || !btn) return;
+    const on = loadLayout().hints === true;
+    box.hidden = !on;
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+  function toggleHints() {
+    const st = loadLayout();
+    st.hints = !(st.hints === true);
+    saveLayout(st);
+    applyHints();
+  }
   function setupConsoleResize() {
     const hdrag = document.getElementById('console-hdrag');
     const con   = document.getElementById('console');
@@ -259,9 +277,48 @@ window.App = (function () {
     launcher.hidden = open;
     dock.classList.toggle('min', !!st.chatMin);
     const mb = document.getElementById('chat-min');
-    if (mb) { mb.textContent = st.chatMin ? '▫' : '─'; mb.title = st.chatMin ? 'Развернуть' : 'Свернуть в заголовок'; }
+    /* Только подпись: раньше здесь переписывался textContent, и это стирало
+       значок внутри кнопки. Состояние показывает css — зеркалит ту же стрелку. */
+    if (mb) mb.title = st.chatMin ? 'Развернуть' : 'Свернуть в заголовок';
     if (st.chatW) dock.style.setProperty('--chat-w', Math.max(340, st.chatW) + 'px');
     if (st.chatH) dock.style.setProperty('--chat-h', st.chatH + 'px');
+    syncChatOverlap();
+    syncChatToolsOvf();
+  }
+
+  /* ── сколько чат отъел у холста ───────────────────────────────────────────
+     Чат — плавающее окно поверх сцены, и правым нижним углом он садился ровно
+     на зум, кнопку подсказок и тумблеры сред: нажать их было нельзя. Считаем
+     перекрытие в пикселях и отдаём css — HUD на эту величину отступает.
+     Только чтение геометрии: раскладку здесь никто не двигает. */
+  const CHAT_WIDE = 500;    /* замер: подписи шапки встают целиком с 497px ширины окна */
+  function syncChatOverlap() {
+    const app = document.getElementById('app');
+    const dock = document.getElementById('chat'), stage = document.getElementById('stage');
+    if (!app || !dock || !stage) return;
+    const open = !dock.hidden;
+    /* Порог подписей в шапке — по ширине самого окна: его тянут мышью, и медиа-
+       запрос по ширине экрана тут ничего не решает. 456px — ширина, при которой
+       497px — замеренная ширина, при которой «✓ чек-лист · ⇲ сжать · ⌫ очистить»
+       и список моделей встают целиком; берём с запасом. */
+    dock.classList.toggle('cd-wide', dock.clientWidth >= CHAT_WIDE);
+    /* Угол занимает ЛИБО окно чата, либо кнопка-лаунчер, которая его замещает.
+       Считали только окно — и при закрытом чате лаунчер садился на тумблер
+       «сервисы»: нажатие открывало чат вместо переключения контуров. Меряем то,
+       что сейчас на экране. */
+    const launcher = document.getElementById('chat-launcher');
+    const box = open ? dock : (launcher && !launcher.hidden ? launcher : null);
+    app.classList.toggle('chat-on', !!box);
+    if (!box) {
+      app.style.setProperty('--chat-ovl-w', '0px');
+      app.style.setProperty('--chat-ovl-h', '0px');
+      return;
+    }
+    const s = stage.getBoundingClientRect(), c = box.getBoundingClientRect();
+    const w = Math.max(0, Math.min(s.width, s.right - c.left));
+    const h = Math.max(0, Math.min(s.height, s.bottom - c.top));
+    app.style.setProperty('--chat-ovl-w', Math.round(w) + 'px');
+    app.style.setProperty('--chat-ovl-h', Math.round(h) + 'px');
   }
   function openChat(on) {
     const s = loadLayout(); s.chatOpen = !!on; if (on) s.chatMin = false; saveLayout(s); applyChatState();
@@ -280,6 +337,7 @@ window.App = (function () {
         if (!box) return;
         if (axis !== 'h') dock.style.setProperty('--chat-w', Math.max(340, Math.min(window.innerWidth - 40, box.right - e.clientX)) + 'px');
         if (axis !== 'w') dock.style.setProperty('--chat-h', Math.max(220, Math.min(window.innerHeight - 78, box.bottom - e.clientY)) + 'px');
+        syncChatOverlap();          /* окно растёт — HUD отходит тем же кадром */
       });
       el.addEventListener('pointerup', e => {
         if (!box) return; box = null; try { el.releasePointerCapture(e.pointerId); } catch (_) {}
@@ -292,6 +350,24 @@ window.App = (function () {
     grab(document.getElementById('cd-w'), 'w');
     grab(document.getElementById('cd-h'), 'h');
     grab(document.getElementById('cd-c'), 'both');
+
+    /* Двойной щелчок по шапке сворачивает окно в заголовок — так же, как
+       двойной щелчок по кромке консоли возвращает её высоту. */
+    const head = dock.querySelector('.chat-head');
+    if (head) head.addEventListener('dblclick', e => {
+      if (e.target.closest('button,select,input,textarea')) return;
+      toggleChatMin();
+    });
+
+    /* Окно плавает над сценой: любая смена его или её геометрии — повод
+       пересчитать, сколько холста осталось живым. */
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver(() => syncChatOverlap());
+      ro.observe(dock);
+      const stage = document.getElementById('stage');
+      if (stage) ro.observe(stage);
+    }
+    window.addEventListener('resize', syncChatOverlap);
   }
   function loadProjectState(id) {
     window.Graph.fromJSON(JSON.parse(localStorage.getItem(LS_PROJECT + id)));
@@ -376,8 +452,10 @@ window.App = (function () {
       const items = Object.entries(window.BLOCKS.TYPES)
         .filter(([t, d]) => d.category === cat.id && (!f || (d.label + ' ' + t + ' ' + d.desc).toLowerCase().includes(f)));
       if (!items.length) return '';
+      /* Счётчик в липкой шапке: при поиске сразу видно, сколько нашлось в
+         категории, а не только что она вообще осталась в списке. */
       return `<section class="pal-group">
-        <div class="pal-head"><span class="micro">${esc(cat.label)}</span><span class="pal-hint">${esc(cat.hint)}</span></div>
+        <div class="pal-head"><span class="micro">${esc(cat.label)}</span><span class="pal-count q-count">${items.length}</span><span class="pal-hint">${esc(cat.hint)}</span></div>
         ${items.map(([t, d]) => `
           <button class="pal-item" draggable="true" data-type="${t}" style="--c:${d.color}" title="${esc(d.desc)}">
             <span class="pal-icon">${esc(d.icon)}</span>
@@ -692,6 +770,33 @@ window.App = (function () {
     syncDetailBtn(m);
     renderEnvBox();
     renderUnitBox();
+    renderLegendBox(m);
+  }
+
+  /* Легенда жгута — коробка HUD рядом с зумом. Наполняет её Harness.render(),
+     здесь только видимость: на свободном холсте словарь проводов не о чем. */
+  function renderLegendBox(view) {
+    const el = document.getElementById('hlegend'); if (!el) return;
+    const btn = document.getElementById('legend-toggle');
+    const harness = (view || window.Editor.getViewMode()) === 'harness';
+    const has = harness && !!el.innerHTML.trim();
+    /* Раскрываемая, а не постоянная полоса. Словарь проводов — 728px содержимого,
+       и в строку HUD он не влезал НИ на одной ширине: на 1500 пряталось 170px,
+       на 560 — 551 из 728, то есть ключ к схеме было нельзя прочесть целиком.
+       Теперь это панель с переносом, а в полосе стоит только кнопка. */
+    if (btn) btn.hidden = !has;
+    el.hidden = !has || !(loadLayout().legend === true);
+    if (btn) {
+      btn.classList.toggle('on', !el.hidden);
+      btn.setAttribute('aria-pressed', el.hidden ? 'false' : 'true');
+    }
+    syncLegendOvf();
+  }
+  function toggleLegend() {
+    const st = loadLayout();
+    st.legend = !(st.legend === true);
+    saveLayout(st);
+    renderLegendBox();
   }
 
   /* Плотность жгута: подробные карточки (грамматика плаката) против обзорных
@@ -829,7 +934,7 @@ window.App = (function () {
              title="${esc(CL.PROFILES[p])}">${esc(p)}</button>`).join('')}
         <span class="chk-sum">нужно <b>${s.todo}</b> · проработано <b>${s.done}</b> из ${s.total}</span>
         <button class="tb" data-act="chk-copy" title="Список неотмеченного — вставить агенту">Скопировать для агента</button>
-        <button class="tb" data-act="chk-all" title="Отметить все пункты профиля как «нужно проработать». Уже проработанное не трогается">Отметить всё</button>
+        <button class="tb accent" data-act="chk-all" title="Отметить все пункты профиля как «нужно проработать». Уже проработанное не трогается">Отметить всё</button>
         <button class="tb" data-act="chk-none" title="Снять все отметки">Снять всё</button>
       </div>
       <div class="chk-hint micro dim">Клик по значку слева гоняет пункт по кругу: ${CHK_MARK.off} не выбран → ${CHK_MARK.todo} нужно проработать → ${CHK_MARK.done} проработано.
@@ -1032,6 +1137,63 @@ window.App = (function () {
     toast('Движок не ответил за 20 секунд — загляни в «Доктор»', 'warn');
     if (window.Doctor) window.Doctor.log('error', 'движок', 'после перезапуска не поднялся за 20 с');
     return false;
+  }
+
+  /* ── обновление конструктора ────────────────────────────────────────────
+     Для человека это одна кнопка, но шагов несколько, и каждый он должен
+     видеть: сперва спрашиваем GitHub, потом с его согласия подменяем файлы,
+     и только потом перезапускаем. Планы и рабочие папки движок не трогает —
+     сказать об этом надо ДО нажатия, а не после. */
+  let updState = null;
+  async function loadUpdate() {
+    if (!document.getElementById('update-box')) return;
+    try {
+      const r = await fetch('api/update', { cache: 'no-store' });
+      updState = r.ok ? await r.json() : null;
+    } catch (e) { updState = null; }
+    renderUpdate();
+  }
+  function renderUpdate() {
+    const box = document.getElementById('update-box'); if (!box) return;
+    const s = updState;
+    /* Жёлтым кнопка горит, только когда обновление действительно есть. Подсветка,
+       включённая всегда, через день перестаёт что-либо означать. Ставим до всех
+       ранних возвратов — тогда любой отказ гасит её сам собой. */
+    const btn = document.querySelector('[data-act="engine-update"]');
+    if (btn) btn.classList.toggle('warn', !!(s && s.ok && s.behind));
+    if (!s) { box.innerHTML = '<span class="warn">движок не ответил про обновления</span>'; return; }
+    if (!s.configured) {
+      box.innerHTML = 'источник не задан: положите репозиторий в <code>TESTER_REPO</code>, например <code>имя/bench</code>';
+      return;
+    }
+    if (!s.ok) { box.innerHTML = '<span class="warn">' + esc(s.error || 'не проверилось') + '</span>'; return; }
+    const cur = s.current ? String(s.current).slice(0, 12) : 'неизвестна';
+    box.innerHTML = s.behind
+      ? `есть новая версия <code>${esc(String(s.latest).slice(0, 12))}</code> — ${esc(s.message || '')} · сейчас <code>${esc(cur)}</code>`
+      : `версия последняя: <code>${esc(cur)}</code> · ${esc(s.repo || '')}@${esc(s.branch || '')}`;
+  }
+  async function updateEngine() {
+    toast('Спрашиваю GitHub…');
+    await loadUpdate();
+    const s = updState;
+    if (!s) return toast('Движок не ответил', 'err');
+    if (!s.configured) return toast('Не задан TESTER_REPO — обновляться неоткуда', 'warn');
+    if (!s.ok) return toast('Проверка не вышла: ' + (s.error || ''), 'err');
+    if (!s.behind) return toast('Уже последняя версия', 'ok');
+    const cur = s.current ? String(s.current).slice(0, 12) : 'неизвестна';
+    if (!confirm(`Обновить конструктор?\n\nсейчас: ${cur}\nновая:  ${String(s.latest).slice(0, 12)}\n${s.message || ''}\n\n`
+               + 'Планы, стройки, чек-листы и рабочие папки не затрагиваются.\nЗаменяемые файлы сохранятся в backups/ — откат командой py update.py rollback.')) return;
+    toast('Скачиваю и подменяю файлы…');
+    let res;
+    try {
+      const r = await fetch('api/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      res = await r.json().catch(() => ({}));
+      if (!r.ok || !res.ok) return toast('Не обновилось: ' + (res.error || r.status), 'err');
+    } catch (e) { return toast('Движок не отвечает: ' + e.message, 'err'); }
+    toast(`Обновлено, файлов: ${res.files}. Перезапускаю…`, 'ok');
+    /* Страницу перезагружаем только когда свежий процесс отозвался: иначе
+       браузер притащит старый интерфейс и человек решит, что ничего не вышло. */
+    if (await restartEngineSilent()) location.reload();
   }
 
   async function wsPick() {
@@ -1500,13 +1662,23 @@ window.App = (function () {
       </div>
       <div class="ws-tree" id="ws-tree" hidden></div>
       <div class="micro dim" id="ws-info"></div></div>`;
-    const engineBlock = `<div class="gmodel"><div class="gmodel-h">Движок · автозапуск и перезапуск</div>
+    const engineBlock = `<div class="gmodel"><div class="gmodel-h">Движок · автозапуск, обновление и перезапуск</div>
       <div id="engine-box"><div class="micro dim">читаю…</div></div>
+      <div id="update-box" class="micro dim">версия: читаю…</div>
       <div class="mcp-apps">
+        <button class="tb" data-act="engine-update" title="Спросить GitHub и обновить конструктор — планы не затрагиваются">Обновить конструктор</button>
         <button class="tb" data-act="engine-restart" title="Поднять свежий процесс — нужно после обновления кода">Перезапустить движок</button>
       </div></div>`;
-    document.getElementById('guide-models').innerHTML = modelsHTML + engineBlock + wsBlock + proxyBlock + bridgeBlock;
+    /* Каждый блок — в свой раздел. Раньше все пять склеивались в один узел и
+       давали свиток на 2452px: поля вверху, кнопка сохранения — тремя экранами ниже. */
+    const putPane = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+    putPane('guide-models', modelsHTML);
+    putPane('guide-engine', engineBlock);
+    putPane('guide-ws',     wsBlock);
+    putPane('guide-proxy',  proxyBlock);
+    putPane('guide-bridge', bridgeBlock);
     loadAutostart();
+    loadUpdate();
     renderWsInfo();
     updateMcpView();
     const mp = document.getElementById('mcp-path');
@@ -1559,7 +1731,26 @@ window.App = (function () {
     }
   }
 
-  function openGuide() { renderGuideModels(); document.getElementById('guide').hidden = false; }
+  /* Разделы панели: открыт ровно один. Выбор запоминаем — настройка обычно
+     правится не по одному разу, и каждый раз искать её заново незачем. */
+  const LS_GPANE = 'tester.guidepane';
+  function switchGuidePane(pane) {
+    if (!pane) return;
+    document.querySelectorAll('#guide-nav .gnav').forEach(b => b.classList.toggle('on', b.dataset.pane === pane));
+    document.querySelectorAll('#guide .gpane').forEach(s => s.classList.toggle('on', s.dataset.pane === pane));
+    const body = document.querySelector('#guide .guide-body');
+    if (body) body.scrollTop = 0;
+    try { localStorage.setItem(LS_GPANE, pane); } catch (e) {}
+  }
+  function openGuide() {
+    renderGuideModels();
+    document.getElementById('guide').hidden = false;
+    let last = 'cheat';
+    try { last = localStorage.getItem(LS_GPANE) || 'cheat'; } catch (e) {}
+    if (!document.querySelector(`#guide .gpane[data-pane="${last}"]`)) last = 'cheat';
+    switchGuidePane(last);
+    syncGuideNavOvf();
+  }
   function closeGuide() { document.getElementById('guide').hidden = true; }
 
   function saveGuideModels() {
@@ -2218,10 +2409,16 @@ window.App = (function () {
   function renderChatModel() {
     const sel = document.getElementById('chat-model'); if (!sel) return;
     const models = (window.Graph.state.meta && window.Graph.state.meta.models) || {};
+    /* В свёрнутом виде показываем ТОЛЬКО метку. Полное имя давало строку в 174px
+       при коробке в 76 — подпись рубилась по живому и упиралась в стрелку.
+       Имя модели никуда не делось: оно в подсказке и в раскрытом списке. */
     sel.innerHTML = ['primary', 'heavy'].map(ref => {
       const m = models[ref] || {};
-      return `<option value="${ref}" ${ref === chatModelRef ? 'selected' : ''}>${esc(m.label || ref)}${m.model ? ' · ' + esc(m.model) : ''}</option>`;
+      const full = (m.label || ref) + (m.model ? ' · ' + m.model : '');
+      return `<option value="${ref}" ${ref === chatModelRef ? 'selected' : ''} title="${esc(full)}">${esc(m.label || ref)}</option>`;
     }).join('');
+    const cur = models[chatModelRef] || {};
+    sel.title = 'Какая модель отвечает' + (cur.model ? ' · ' + cur.model : '');
   }
 
   /* Достать план из ответа ИИ: сперва из ```json```-блока, иначе первый {…} с nodes+edges. */
@@ -2659,6 +2856,7 @@ window.App = (function () {
   /* ── старт ──────────────────────────────────────────── */
   async function init() {
     window.Editor.init({ onChange: onGraphChange, onSelect: onSelectIds });
+    applyHints();
     /* стройка изменилась — перекрасить схему и пересчитать счётчик (план не трогаем) */
     window.Build.onChange(() => { window.Editor.render(); renderBuildCount(); renderQueue(); });
     /* доктор должен видеть состояние приложения, а вкладка — счётчик ошибок */
@@ -2842,7 +3040,7 @@ window.App = (function () {
     const env = loadLayout().hEnv;
     if (env) window.Harness.ENVS.forEach(e => { if (e in env) window.Harness.setEnvShow(e, env[e]); });
     window.Harness.setUnitShow(loadLayout().hUnit === true);   // контуры сервисов — по умолчанию off
-    syncDetailBtn(); renderEnvBox(); renderUnitBox();
+    syncDetailBtn(); renderEnvBox(); renderUnitBox(); renderLegendBox();
     applyPalMin(loadLayout().palMin);
     applyInspMin(loadLayout().inspMin);
     applyBridgeState();   // возобновить сопряжение с приложениями, если было включено
@@ -2864,6 +3062,9 @@ window.App = (function () {
       else if (a === 'close-inspector') closeInspector();
       else if (a === 'close-drawers') closePalette();
       else if (a === 'close-guide') closeGuide();
+      else if (a === 'hints-toggle') toggleHints();
+      else if (a === 'legend-toggle') toggleLegend();
+      else if (a === 'guide-pane') switchGuidePane(b.dataset.pane);
       else if (a === 'guide-save-models') saveGuideModels();
       else if (a === 'chk-cycle') { window.CheckState.cycle(b.dataset.id); renderChecklist(); }
       else if (a === 'chk-profile') { window.CheckState.setProfile(b.dataset.p); renderChecklist(); }
@@ -2897,6 +3098,7 @@ window.App = (function () {
       else if (a === 'chkstart-skip') chkStartHide();
       else if (a === 'chat-checklist') chatChecklist();
       else if (a === 'engine-restart') restartEngine();
+      else if (a === 'engine-update') updateEngine();
       else if (a === 'doc-run') renderDoctor();
       else if (a === 'doc-clear') { window.Doctor.clear(); renderDoctor(); }
       else if (a === 'doc-copy') window.Doctor.report().then(t => copyText(t, 'Отчёт доктора в буфере'));
@@ -2941,6 +3143,11 @@ window.App = (function () {
     window.addEventListener('keydown', e => {
       const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
       const ctrl = e.ctrlKey || e.metaKey;
+      /* Esc внутри чата закрывает чат — раньше окно не закрывалось ни клавишей,
+         ни крестиком. Набранное не пропадает: окно прячется, поле остаётся. */
+      if (e.key === 'Escape' && e.target.closest && e.target.closest('#chat')) {
+        e.preventDefault(); return openChat(false);
+      }
       if (ctrl && e.key.toLowerCase() === 's') { e.preventDefault(); return exportJSON(); }
       if (ctrl && e.key.toLowerCase() === 'z') { e.preventDefault(); return e.shiftKey ? redo() : undo(); }
       if (ctrl && e.key.toLowerCase() === 'y') { e.preventDefault(); return redo(); }
@@ -2962,9 +3169,46 @@ window.App = (function () {
     });
 
     window.addEventListener('beforeunload', saveNow);
+
+    watchOverflow('.toolbar');       /* топбар: часть кнопок уезжает за край */
+    watchOverflow('.console-tabs');  /* вкладки консоли — то же самое на узком */
+    /* Тот же механизм на полосе орудий чата и на легенде жгута: обе полосы
+       узкие по определению, и обеим нужен видимый признак, что есть ещё. */
+    syncChatToolsOvf = watchOverflow('#chat-tools');
+    syncLegendOvf = watchOverflow('#hlegend');
+    /* Колонка разделов панели ✦ ИИ: на 560 седьмой раздел «Бриф» стоит за краем,
+       и она была единственной полосой без признака переполнения. Пересчитать
+       надо при открытии: на старте модалка скрыта, размеров у полосы нет,
+       и наблюдатель за размером молчит. */
+    syncGuideNavOvf = watchOverflow('#guide-nav');
   }
 
-  return { init, toast, commit, refresh, exportJSON, issueOrder };
+  /* Полосы, содержимое которых перерисовывает код, а не раскладка: маску надо
+     пересчитать вручную — ResizeObserver молчит, если коробка не изменилась. */
+  let syncChatToolsOvf = () => {}, syncLegendOvf = () => {}, syncGuideNavOvf = () => {};
+  function syncHudOverflow() { syncLegendOvf(); syncChatToolsOvf(); }
+
+  /* ── признак переполнения по горизонтали ──────────────────────────────
+     Полосы, которые прокручиваются вбок (ряд кнопок топбара, вкладки консоли),
+     раньше молча обрезали содержимое: волосяная полоса прокрутки в 3px об этом
+     не сообщала. Классами ovf-l / ovf-r css рисует затемнение у того края, за
+     которым ещё что-то есть, — и убирает его, когда доехали до конца. */
+  function watchOverflow(sel) {
+    const el = document.querySelector(sel);
+    if (!el) return () => {};
+    const sync = () => {
+      const max = el.scrollWidth - el.clientWidth;
+      el.classList.toggle('ovf-l', el.scrollLeft > 2);
+      el.classList.toggle('ovf-r', max > 2 && el.scrollLeft < max - 2);
+    };
+    el.addEventListener('scroll', sync, { passive: true });
+    if (window.ResizeObserver) new ResizeObserver(sync).observe(el);
+    window.addEventListener('resize', sync);
+    sync();
+    return sync;                 /* содержимое меняется из кода — даём чем пересчитать */
+  }
+
+  return { init, toast, commit, refresh, exportJSON, issueOrder, syncHudOverflow, syncChatOverlap };
 })();
 
 /* скрипты грузятся динамически, DOMContentLoaded мог уже пройти */

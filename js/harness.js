@@ -19,7 +19,10 @@ window.Harness = (function () {
      ФАКТЫ. Такт (тайминги, повторы, режим) вынесен отдельной строкой и своим
      цветом: схема должна отвечать не только «кто с кем», но и «как часто».
      Плотный чип остаётся для обзора большой схемы — переключателем. */
-  const CARD_W = 252, CARD_PAD = 10, ROW_NAME = 18, ROW_SUB = 15, ROW_FACT = 14;
+  /* Числа держат ту же шкалу, что и стили: CARD_PAD = --s5 (12), ROW_SUB =
+     --badge-h (18). Пока padding в css был 12, а здесь 10, карточка выходила
+     на 4px короче содержимого и нижнюю строку подрезало. */
+  const CARD_W = 252, CARD_PAD = 12, ROW_NAME = 18, ROW_SUB = 18, ROW_FACT = 14;
   const FACT_LINES = 2, HEAD_H = 32;
   let detail = true;
   const chipW = () => detail ? CARD_W : CHIP_W;
@@ -235,7 +238,10 @@ window.Harness = (function () {
     }));
 
     backY = bandTop[cats.length - 1] + bandH[cats.length - 1] + BACK_GAP;
-    box = { x1: bx1 - 20, y1: Y0 - 20, x2: bx2 + 20, y2: backY + 96 };   // снизу — место под легенду
+    // снизу — только полосы возвратных связей (5 дорожек по 9px): легенда ушла в
+    // HUD и место под себя в схеме больше не занимает, а лишний запас в 96px
+    // сжимал схему при подгонке по экрану
+    box = { x1: bx1 - 20, y1: Y0 - 20, x2: bx2 + 20, y2: backY + 52 };
 
     // ручные позиции чипов (перетаскивание) кладём поверх авто-раскладки;
     // следы удалённых узлов подчищаем, границы вида тянем под утащенные чипы
@@ -510,23 +516,24 @@ window.Harness = (function () {
   }
 
   /* Легенда: цвет и штрих провода — это словарь, и его надо где-то объявить.
-     Стоит под последней шиной, в потоке чтения после самой схемы. Среды
-     перечисляем только подсвеченные — легенда описывает то, что видно. */
+     Раньше она стояла под последней шиной ВНУТРИ масштабируемого слоя и уезжала
+     вместе со схемой: на 30% зума от кегля 10px оставалось три пикселя. Словарь
+     описывает не схему, а способ на неё смотреть, — поэтому он ушёл в HUD, к
+     зуму, и рисуется в экранных пикселях. Среды перечисляем только подсвеченные:
+     легенда описывает то, что сейчас видно. */
   const ENV_HINT = { client: 'машина пользователя', server: 'наш сервер', external: 'выход за периметр' };
   function legendHTML() {
     if (!buses.length) return '';        // пустой проект: словарь без схемы описывать нечего
-    const line = (cls, txt) => `<span class="hleg-i"><svg width="26" height="8" viewBox="0 0 26 8">
-      <path class="hleg-w ${cls}" d="M1 4H25"/></svg>${esc(txt)}</span>`;
+    const line = (cls, txt) => `<span class="hleg-i" title="${esc(txt)}"><svg width="24" height="8" viewBox="0 0 24 8" aria-hidden="true">
+      <path class="hleg-w ${cls}" d="M1 4H23"/></svg>${esc(txt)}</span>`;
     const env = ENVS.filter(e => envShow[e] && envRects(e).length).map(e =>
-      `<span class="hleg-i"><i class="hc-env ${e}">${esc(ZONE[e].label)}</i>${esc(ENV_HINT[e])}</span>`).join('');
-    return `<div class="hlegend" style="left:${(box.x1 + 50).toFixed(1)}px;top:${(backY + 26).toFixed(1)}px">
-      <b>Легенда</b>
+      `<span class="hleg-i" title="${esc(ZONE[e].label)} — ${esc(ENV_HINT[e])}"><i class="hc-env ${e}">${esc(ZONE[e].label)}</i>${esc(ENV_HINT[e])}</span>`).join('');
+    return `<b>Легенда</b>
       ${line('flow', 'порядок выполнения')}
       ${line('data', 'знания и данные')}
       ${line('back', 'возврат цикла')}
-      <span class="hleg-i"><i class="hleg-c"></i>цвет провода — тип блока-источника</span>
-      ${env}
-    </div>`;
+      <span class="hleg-i" title="цвет провода — тип блока-источника"><i class="hleg-c"></i>цвет провода — тип блока-источника</span>
+      ${env}`;
   }
 
   function els() {
@@ -566,8 +573,15 @@ window.Harness = (function () {
     const selection = sel || new Set();
     layout();
     $wires.innerHTML = zonesSVG() + busSVG() + unitContoursSVG() + wiresSVG(selection);
-    $chips.innerHTML = zoneLabelsHTML() + unitLabelsHTML() + labelsHTML() + legendHTML() +
+    $chips.innerHTML = zoneLabelsHTML() + unitLabelsHTML() + labelsHTML() +
       window.Graph.state.nodes.map(n => chipHTML(n, selection)).join('');
+    /* Легенда живёт в HUD, а не в слое чипов: её кегль не должен зависеть от зума */
+    const lg = document.getElementById('hlegend');
+    if (lg) {
+      lg.innerHTML = legendHTML();
+      lg.hidden = !lg.innerHTML.trim();
+      if (window.App && window.App.syncHudOverflow) window.App.syncHudOverflow();
+    }
   }
 
   return {

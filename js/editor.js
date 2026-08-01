@@ -145,9 +145,17 @@ window.Editor = (function () {
       const y1 = Math.min(...list.map(n => n.y)) - UNIT_PAD;
       const x2 = Math.max(...list.map(n => n.x + NODE_W)) + UNIT_PAD;
       const y2 = Math.max(...list.map(n => n.y + nodeHeight(n))) + UNIT_PAD;
+      /* Подпись повторяем вдоль всей верхней кромки. Контур сервиса бывает шире
+         экрана, и с единственным ярлыком у левого края, работая в его середине,
+         невозможно понять, в каком сервисе находишься. */
+      const LABEL_STEP = 280;
+      const times = Math.max(1, Math.floor((x2 - x1 - 28) / LABEL_STEP) + 1);
+      const labels = Array.from({ length: times }, (_, i) =>
+        `<text x="${(x1 + 14 + i * LABEL_STEP).toFixed(1)}" y="${(y1 - 8).toFixed(1)}">${esc(name)}</text>`
+      ).join('');
       out.push(`<g class="unit-box">
         <rect x="${x1.toFixed(1)}" y="${y1.toFixed(1)}" width="${(x2 - x1).toFixed(1)}" height="${(y2 - y1).toFixed(1)}" rx="16"/>
-        <text x="${(x1 + 14).toFixed(1)}" y="${(y1 - 8).toFixed(1)}">${esc(name)}</text>
+        ${labels}
       </g>`);
     }
     return out;
@@ -180,9 +188,20 @@ window.Editor = (function () {
     $edges.innerHTML = out.join('');
   }
 
+  /* Ступени зума. На 13–25% кегль 11px даёт полтора пикселя серой каши: текст
+     уже не читается, но продолжает мылить картинку. Классом на сцене решаем,
+     что показывать — подробности, только заголовок или цветную плитку.
+     Пороги с запасом: 0.72 — примерно там, где перестаёт читаться 10px. */
+  const Z_MID = 0.72, Z_FAR = 0.45;
+  function applyZoomTier() {
+    $stage.classList.toggle('z-mid', view.k < Z_MID && view.k >= Z_FAR);
+    $stage.classList.toggle('z-far', view.k < Z_FAR);
+  }
+
   let idleTimer = null;
   function applyView() {
     $viewport.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.k})`;
+    applyZoomTier();
     const z = document.getElementById('zoom-val');
     if (z) z.textContent = Math.round(view.k * 100) + '%';
     // слой держим только пока двигаемся — иначе Chrome не перерастрирует текст
@@ -310,9 +329,15 @@ window.Editor = (function () {
      в одну кашу. Заметки не двигаем — их расставляет человек. */
   function autoLayout() {
     if (viewMode === 'harness') return;          // жгут раскладывается сам, координаты холста не трогаем
+    /* Мерить карточки нужно в ПОЛНОМ виде. Ступени z-mid/z-far на отдалении
+       прячут тело карточки, и раскладка укладывала блоки по укороченной
+       высоте: на отдалении выглядело верно, а стоило приблизить — тело
+       возвращалось, и блоки наезжали друг на друга. Ступень вернёт
+       applyZoomTier() из финального render(). */
+    $stage.classList.remove('z-mid', 'z-far');
     const G = window.Graph, st = G.state;
     const movable = st.nodes.filter(n => n.type !== 'note');
-    if (!movable.length) return;
+    if (!movable.length) { applyZoomTier(); return; }
     const alive = {}; movable.forEach(n => alive[n.id] = n);
 
     const flowEdges = st.edges.filter(e => e.kind === 'flow' && !G.isBackEdge(e) && alive[e.from.node] && alive[e.to.node]);

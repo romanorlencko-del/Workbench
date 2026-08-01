@@ -30,36 +30,50 @@
 
     <input id="pipeline-name" class="pipeline-name" spellcheck="false" value="Новый конвейер">
 
+    <!-- Кнопки собраны в группы по смыслу: волосяной разделитель в 1px на плотном
+         ряду не читался, а когда подписи гаснут — оставались 39 одинаковых иконок. -->
     <div class="toolbar">
-      <div class="modeswitch" id="modeswitch">
-        <button class="tb msw on" data-act="mode-plan"  title="Режим: разработка плана — рисуем схему (M)">▤ <span class="lbl-txt">План</span></button>
-        <button class="tb msw"    data-act="mode-build" title="Режим: стройка — что из плана уже построено в коде (M)">⚒ <span class="lbl-txt">Стройка</span></button>
+      <div class="tbg" role="group" aria-label="Режим работы">
+        <div class="modeswitch" id="modeswitch">
+          <button class="tb msw on" data-act="mode-plan"  title="Режим: разработка плана — рисуем схему (M)">▤ <span class="lbl-txt">План</span></button>
+          <button class="tb msw"    data-act="mode-build" title="Режим: стройка — что из плана уже построено в коде (M)">⚒ <span class="lbl-txt">Стройка</span></button>
+        </div>
+        <span class="buildcount" id="buildcount" title="Готово блоков из всех в плане"></span>
       </div>
-      <span class="buildcount" id="buildcount" title="Готово блоков из всех в плане"></span>
-      <span class="tb-sep"></span>
-      <button class="tb" data-act="new"    title="Новый проект">＋ <span class="lbl-txt">Проект</span></button>
-      <button class="tb" data-act="import" title="Импорт JSON">↧ <span class="lbl-txt">Импорт</span></button>
-      <button class="tb" data-act="export" title="Экспорт JSON (Ctrl+S)">↥ <span class="lbl-txt">Экспорт</span></button>
-      <span class="tb-sep"></span>
-      <button class="tb icon" data-act="undo" title="Отменить (Ctrl+Z)">↺</button>
-      <button class="tb icon" data-act="redo" title="Вернуть (Ctrl+Shift+Z)">↻</button>
-      <span class="tb-sep"></span>
-      <div class="viewswitch">
-        <button class="tb vsw on" data-act="view-graph"   title="Свободный холст">◻ <span class="lbl-txt">Холст</span></button>
-        <button class="tb vsw"    data-act="view-harness" title="Жгут: шины по категориям (H)">⌇ <span class="lbl-txt">Жгут</span></button>
+
+      <div class="tbg" role="group" aria-label="Проект и файлы">
+        <button class="tb" data-act="new"    title="Новый проект">＋ <span class="lbl-txt">Проект</span></button>
+        <button class="tb" data-act="import" title="Импорт JSON">↧ <span class="lbl-txt">Импорт</span></button>
+        <button class="tb" data-act="export" title="Экспорт JSON (Ctrl+S)">↥ <span class="lbl-txt">Экспорт</span></button>
       </div>
-      <button class="tb icon" data-act="hdetail" id="hdetail" hidden
-        title="Жгут: подробные карточки ⇄ плотные чипы">▤</button>
-      <span class="tb-sep"></span>
-      <button class="tb icon" data-act="layout" title="Разложить схему по слоям (L)">⌗</button>
-      <button class="tb icon" data-act="fit"  title="Вместить всё (F)">⛶</button>
-      <button class="tb icon" data-act="grid" title="Привязка к сетке">▦</button>
-      <button class="tb icon" data-act="collide" title="Коллизии: блоки не налезают, провода огибают">⧉</button>
-      <span class="tb-sep"></span>
-      <button class="tb" data-act="guide" title="Инструкция и бриф для ИИ">✦ <span class="lbl-txt">ИИ</span></button>
-      <button class="tb" data-act="check" title="Проверить конвейер">✓ <span class="lbl-txt">Проверить</span></button>
-      <button class="tb primary" data-act="run" title="Прогон плана">▶ Прогон</button>
-      <button class="tb icon drawer-btn" data-act="toggle-inspector" title="Параметры" aria-label="Открыть параметры">⚙</button>
+
+      <div class="tbg" role="group" aria-label="История правок">
+        <button class="tb icon" data-act="undo" title="Отменить (Ctrl+Z)">↺</button>
+        <button class="tb icon" data-act="redo" title="Вернуть (Ctrl+Shift+Z)">↻</button>
+      </div>
+
+      <div class="tbg" role="group" aria-label="Представление">
+        <div class="viewswitch">
+          <button class="tb vsw on" data-act="view-graph"   title="Свободный холст">◻ <span class="lbl-txt">Холст</span></button>
+          <button class="tb vsw"    data-act="view-harness" title="Жгут: шины по категориям (H)">⌇ <span class="lbl-txt">Жгут</span></button>
+        </div>
+        <button class="tb icon" data-act="hdetail" id="hdetail" hidden
+          title="Жгут: подробные карточки ⇄ плотные чипы">▤</button>
+      </div>
+
+      <div class="tbg" role="group" aria-label="Раскладка схемы">
+        <button class="tb icon" data-act="layout" title="Разложить схему по слоям (L)">⌗</button>
+        <button class="tb icon" data-act="fit"  title="Вместить всё (F)">⛶</button>
+        <button class="tb icon" data-act="grid" title="Привязка к сетке">▦</button>
+        <button class="tb icon" data-act="collide" title="Коллизии: блоки не налезают, провода огибают">⧉</button>
+      </div>
+
+      <div class="tbg tbg-act" role="group" aria-label="Действия">
+        <button class="tb" data-act="guide" title="Инструкция и бриф для ИИ">✦ <span class="lbl-txt">ИИ</span></button>
+        <button class="tb" data-act="check" title="Проверить конвейер">✓ <span class="lbl-txt">Проверить</span></button>
+        <button class="tb primary" data-act="run" title="Прогон плана">▶ Прогон</button>
+        <button class="tb icon drawer-btn" data-act="toggle-inspector" title="Параметры" aria-label="Открыть параметры">⚙</button>
+      </div>
     </div>
   </header>
 
@@ -102,9 +116,21 @@
         <button class="hud-btn zoom-val" data-act="zoom-reset" id="zoom-val">100%</button>
         <button class="hud-btn" data-act="zoom-in">+</button>
       </div>
+      <!-- Подсказки нужны один раз, а место у нижней кромки холста занимали всегда.
+           Теперь это переключатель: состояние помнится между сеансами. Кнопка идёт
+           сразу за зумом — это тоже управление холстом, и в один ряд они встают
+           даже на узкой полосе. -->
+      <button class="hud-btn hud-help" data-act="hints-toggle" id="hints-toggle"
+        title="Подсказки по управлению холстом" aria-pressed="false">?</button>
+      <!-- Легенда жгута. Раньше она жила внутри #viewport и масштабировалась вместе
+           со схемой: на 30% зума кегль 10px превращался в три пикселя каши. Теперь
+           это такая же полоса HUD, как зум, — экранная, а не холстовая. -->
+      <button class="hud-btn hud-help" data-act="legend-toggle" id="legend-toggle"
+        title="Легенда жгута: что означают цвета и виды проводов" aria-pressed="false" hidden>⌇</button>
+      <div class="hlegend" id="hlegend" hidden></div>
       <div class="envbox" id="envbox" hidden></div>
       <div class="unitbox" id="unitbox" hidden></div>
-      <div class="hints micro">
+      <div class="hints micro" id="stage-hints" hidden>
         <b>трекпад / колесо</b> панорама · <b>Ctrl+колесо, щипок</b> зум · <b>ПКМ / пробел</b> тянуть холст ·
         <b>тяни порт</b> связь · <b>Del</b> удалить · <b>Ctrl+D</b> дубль
       </div>
@@ -153,14 +179,62 @@
     <div class="cd-edge cd-w" id="cd-w" title="Тянуть — ширина"></div>
     <div class="cd-edge cd-h" id="cd-h" title="Тянуть — высота"></div>
     <div class="cd-corner" id="cd-c" title="Тянуть — размер"></div>
+    <!-- Шапка чата: три части. Название сжимается многоточием, орудия разговора
+         живут в прокручиваемой полосе с той же маской переполнения, что у топбара,
+         а «свернуть» и «закрыть» закреплены справа и не уезжают за край никогда. -->
     <div class="chat-head">
       <span class="chat-title">✦ Чат с ИИ</span>
-      <select id="chat-model" class="chat-model" title="Какая модель отвечает"></select>
-      <button class="tb" data-act="chat-checklist" title="Дать агенту чек-лист проекта: что отмечено как «нужно проработать»">✓ чек-лист</button>
-      <button class="tb" data-act="chat-compact" title="Сжать разговор в короткую сводку — контекст экономится, суть остаётся">сжать</button>
-      <button class="tb" data-act="chat-clear" title="Очистить историю чата (проект ИИ по-прежнему видит)">очистить</button>
-      <button class="tb icon" data-act="chat-min" id="chat-min" title="Свернуть в заголовок">─</button>
-      <button class="tb icon" data-act="chat-close" title="Закрыть (вернуть кнопкой справа внизу)">✕</button>
+      <div class="chat-tools" id="chat-tools">
+        <select id="chat-model" class="chat-model" title="Какая модель отвечает"></select>
+        <!-- Контурные значки вместо глифов: глиф зависит от шрифта системы, у ⌫ и ⇲
+             начертание гуляет, а часть шрифтов их вовсе не знает. SVG красится
+             currentColor, поэтому сам подхватывает наведение и акцент. -->
+        <button class="tb" data-act="chat-checklist" title="Дать агенту чек-лист проекта: что отмечено как «нужно проработать»">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="4" width="5" height="5" rx="1.2"/>
+            <path d="M4.2 6.5 5.9 8.2 9.6 4.1"/>
+            <rect x="3" y="10.6" width="5" height="5" rx="1.2"/>
+            <rect x="3" y="17.2" width="5" height="5" rx="1.2"/>
+            <path d="M11.4 6.5h9.4M11.4 13.1h9.4M11.4 19.7h6.6"/>
+          </svg><span class="cd-txt">чек-лист</span></button>
+        <button class="tb" data-act="chat-compact" title="Сжать разговор в короткую сводку — контекст экономится, суть остаётся">
+          <!-- Стрелки к центру по диагонали: «свести к одному». -->
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 18L11 13"/>
+            <path d="M11 13H7"/>
+            <path d="M11 13v4"/>
+            <path d="M18 6L13 11"/>
+            <path d="M13 11h4"/>
+            <path d="M13 11V7"/>
+            <path d="M6.5 10.5l3-3"/>
+            <path d="M14.5 17.5l3-3"/>
+          </svg><span class="cd-txt">сжать</span></button>
+        <button class="tb" data-act="chat-clear" title="Очистить историю чата (проект ИИ по-прежнему видит)">
+          <!-- Веник. Рисунок в поле 120, а остальные значки в поле 24, поэтому
+               толщину пересчитываем по доле стороны: 1.7/24 = 0.0708, столько же
+               в поле 120 даёт 8.5. Исходные 3.1 — это 0.026 доли, линия вышла бы
+               втрое тоньше соседних и в 18px почти растворилась. -->
+          <svg class="ico" viewBox="0 0 120 120" style="stroke-width:8.5" aria-hidden="true">
+            <path d="M66.49 57.02L91.03 22.7A3.68 3.68 0 0 1 96.95 27.08L71.49 61.43C73.26 63.77 75.04 65.98 76.91 68.21C76.71 72.36 76.08 73.23 73.86 76.6C70.97 83.48 66.33 97.84 57.59 98.72C55.6 98.92 54.37 97.91 52.51 97.45C53.25 95.14 53.71 93.28 54.2 90.92C50.31 91.31 47.17 92.3 43.35 93.63C38.16 90.52 34.47 87.74 31.15 82.7C27.19 80.13 25.34 78.54 23.01 74.31C28.65 71.78 35.11 70.42 40.3 66.79C43.95 64.24 46.89 60.73 50.47 58.04C51.78 56.21 53.08 54.65 54.54 52.96C56.23 52.96 57.93 52.96 59.62 52.96C62.13 54.89 63.66 55.71 66.49 57.02Z"/>
+            <path d="M50.47 58.04C57.72 64.92 65.81 70.72 73.86 76.6"/>
+            <path d="M66.49 57.02L71.49 61.43"/>
+            <path d="M31.15 82.7C34.6 81.01 37.96 79.21 41.32 77.36"/>
+            <path d="M54.2 90.92C55.66 88.76 57.18 86.66 58.61 84.48"/>
+          </svg><span class="cd-txt">очистить</span></button>
+      </div>
+      <div class="chat-win">
+        <button class="tb icon" data-act="chat-min" id="chat-min" title="Свернуть в заголовок">
+          <!-- Пара шевронов: свернуть и развернуть окно. -->
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 10l4-4 4 4"/>
+            <path d="M8 14l4 4 4-4"/>
+          </svg></button>
+        <button class="tb icon" data-act="chat-close" title="Закрыть — Esc (вернуть кнопкой справа внизу)">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5.8 5.8 16.9 16.9M16.9 5.8 5.8 16.9"/>
+            <path class="ico-fill" d="M19.3 15.5l.63 1.67 1.67.63-1.67.63-.63 1.67-.63-1.67-1.67-.63 1.67-.63z"/>
+          </svg></button>
+      </div>
     </div>
     <div class="chat-log" id="chat-log"></div>
     <form class="chat-input" id="chat-form">
@@ -198,30 +272,40 @@
         <span class="guide-title">✦ ИИ · как дорабатывать план</span>
         <button class="tb icon" data-act="close-guide" title="Закрыть">✕</button>
       </div>
-      <div class="guide-body">
-        <section class="guide-sec">
-          <h4>Шпаргалка</h4>
-          <ul class="guide-list">
-            <li><b>Узел = шаг</b> (его параметры — ТЗ шага), <b>ребро = связь</b>. Порядок по потоку = порядок сборки.</li>
-            <li>Порты двух видов: <b>flow</b> (сплошная — порядок выполнения) и <b>data</b> (пунктир — знания/контекст). Соединять можно только <b>одинаковые</b>.</li>
-            <li>Правка экономно: меняй минимум → верни <b>весь план минифицированным JSON</b> → кнопка <b>Импорт (↥)</b>. <code>id</code> держи стабильными, <code>meta.rev</code> +1, затем <b>⌗</b> разложит.</li>
-            <li>Полный каталог блоков и схема JSON — файл <b>AI_GUIDE.md</b> в проекте (и в брифе ниже).</li>
-          </ul>
-        </section>
-        <section class="guide-sec">
-          <h4>Подключение ИИ · локальный / облачный</h4>
-          <div id="guide-models"></div>
-          <div class="guide-row">
-            <button class="tb primary" data-act="guide-save-models">Сохранить подключения</button>
-            <button class="tb" data-act="guide-apply-all" title="Записать это подключение во все проекты и сделать дефолтом">Применить ко всем проектам</button>
-            <span class="micro dim">сохраняется в этот проект <b>и как подключение по умолчанию</b> для новых · ключ хранится отдельно, в план идёт только имя env-переменной (<code>api_key_env</code>)</span>
-          </div>
-        </section>
-        <section class="guide-sec">
-          <h4>Бриф для ИИ</h4>
-          <p class="micro dim">Сжатые правила + текущий план минифицированным JSON. Вставь в Hermes-агента или локальный ИИ — он вернёт обновлённый JSON, ты импортируешь через ↥.</p>
-          <button class="tb primary" data-act="guide-copy-brief">⧉ Скопировать бриф</button>
-        </section>
+      <div class="guide-main">
+        <nav class="guide-nav" id="guide-nav" aria-label="Разделы настроек">
+          <button class="gnav on" data-act="guide-pane" data-pane="cheat">Шпаргалка</button>
+          <button class="gnav"    data-act="guide-pane" data-pane="models" title="Основная и тяжёлая модель: провайдер, ключ, лимиты">Модели</button>
+          <button class="gnav"    data-act="guide-pane" data-pane="engine" title="Автозапуск, версия, обновление, перезапуск">Движок <span class="gnav-dot" id="gnav-dot-engine" hidden></span></button>
+          <button class="gnav"    data-act="guide-pane" data-pane="ws"     title="Где проекты превращаются в код">Папка сборок</button>
+          <button class="gnav"    data-act="guide-pane" data-pane="proxy"  title="Обход CORS облачных API">Прокси</button>
+          <button class="gnav"    data-act="guide-pane" data-pane="bridge" title="Cursor / Claude Desktop / Antigravity">Сопряжение</button>
+          <button class="gnav"    data-act="guide-pane" data-pane="brief"  title="Сжатые правила + план одним JSON">Бриф</button>
+        </nav>
+        <div class="guide-body">
+          <section class="gpane on" data-pane="cheat">
+            <ul class="guide-list">
+              <li><b>Узел = шаг</b> (его параметры — ТЗ шага), <b>ребро = связь</b>. Порядок по потоку = порядок сборки.</li>
+              <li>Порты двух видов: <b>flow</b> (сплошная — порядок выполнения) и <b>data</b> (пунктир — знания/контекст). Соединять можно только <b>одинаковые</b>.</li>
+              <li>Правка экономно: меняй минимум → верни <b>весь план минифицированным JSON</b> → кнопка <b>Импорт (↥)</b>. <code>id</code> держи стабильными, <code>meta.rev</code> +1, затем <b>⌗</b> разложит.</li>
+              <li>Полный каталог блоков и схема JSON — файл <b>AI_GUIDE.md</b> в проекте (и в разделе «Бриф»).</li>
+            </ul>
+          </section>
+          <section class="gpane" data-pane="models"><div id="guide-models"></div></section>
+          <section class="gpane" data-pane="engine"><div id="guide-engine"></div></section>
+          <section class="gpane" data-pane="ws"><div id="guide-ws"></div></section>
+          <section class="gpane" data-pane="proxy"><div id="guide-proxy"></div></section>
+          <section class="gpane" data-pane="bridge"><div id="guide-bridge"></div></section>
+          <section class="gpane" data-pane="brief">
+            <p class="micro dim">Сжатые правила + текущий план минифицированным JSON. Вставь в Hermes-агента или локальный ИИ — он вернёт обновлённый JSON, ты импортируешь через ↥.</p>
+            <button class="tb primary" data-act="guide-copy-brief">⧉ Скопировать бриф</button>
+          </section>
+        </div>
+      </div>
+      <div class="guide-foot">
+        <button class="tb primary" data-act="guide-save-models">Сохранить подключения</button>
+        <button class="tb" data-act="guide-apply-all" title="Записать это подключение во все проекты и сделать дефолтом">Применить ко всем проектам</button>
+        <span class="micro dim">сохраняется в этот проект <b>и как подключение по умолчанию</b> для новых · ключ хранится отдельно, в план идёт только имя env-переменной (<code>api_key_env</code>)</span>
       </div>
     </div>
   </div>

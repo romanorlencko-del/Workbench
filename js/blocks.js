@@ -549,7 +549,7 @@ window.BLOCKS = (function () {
         const base = [IN('in', 'вход', 'flow', true), IN('kb', 'знания', 'data', true)];
         return p.graph_in ? base.concat([IN('graph', 'карта', 'data', true)]) : base;
       },
-      outputs: [OUT('out', 'дальше')],
+      outputs: p => withErr([OUT('out', 'дальше')], p),
       params: [
         { key: 'provider', label: 'Провайдер', type: 'select', default: 'project',
           options: [['project','модель проекта'],['openai-compatible','OpenAI-совместимый'],['anthropic','Anthropic'],['ollama','Ollama'],['custom','свой HTTP']] },
@@ -569,6 +569,13 @@ window.BLOCKS = (function () {
         { key: 'tools', label: 'Инструменты', type: 'tags', placeholder: 'web_search' },
         { key: 'graph_in', label: 'Вход «карта»: принимать граф связей отдельным data-портом', type: 'bool', default: false },
         { key: 'output_var', label: 'Записать в', type: 'text', default: 'ctx.answer' },
+        /* Провод ошибки нужен и агенту: срыв вызова модели — рядовое событие
+           (таймаут, лимит шлюза, недоступный провайдер), и без него единственным
+           исходом остаётся остановка всей ветки. Тогда сбой одного вызова не
+           отличить от отрицательного результата — а это разные вещи. Порт, как у
+           остальных, появляется только по осознанному выбору «увести по проводу». */
+        { key: 'on_error', label: 'При ошибке', type: 'select', default: 'fail',
+          options: [['fail','остановить'],['continue','продолжить'],['retry','повторить'],['route','увести по проводу']] },
         ...RETRY(2),
         { key: 'timeout_s', label: 'Таймаут, с', type: 'number', default: 180.000, step: 0.001 },
         { key: 'stream', label: 'Стриминг', type: 'bool', default: false },
@@ -588,7 +595,7 @@ window.BLOCKS = (function () {
       label: 'Эксперт', category: 'work', color: '#a78bfa', icon: '◈',
       desc: 'Агент с узкой специализацией. Работает по своему чек-листу, возвращает находки в общей схеме. Критичность не выставляет — это делает отдельный агент градации.',
       inputs: [IN('in', 'вход', 'flow', true), IN('kb', 'контекст', 'data', true)],
-      outputs: [OUT('out', 'находки')],
+      outputs: p => withErr([OUT('out', 'находки')], p),
       params: [
         { key: 'role', label: 'Направление', type: 'text', required: true, placeholder: 'логика' },
         { key: 'checklist', label: 'Чек-лист: по пункту на строку', type: 'textarea', required: true,
@@ -606,6 +613,11 @@ window.BLOCKS = (function () {
         ...RETRY(2),
         { key: 'timeout_s', label: 'Таймаут, с', type: 'number', default: 600.000, step: 0.001 },
         { key: 'output_var', label: 'Находки в', type: 'text', default: 'ctx.findings_expert' },
+        /* Набор как у агента, а не как у группы: там сбой одного эксперта ещё не
+           рушит направление, и выбор идёт про остальных — «пометить неполным»,
+           «пропустить». Одиночному эксперту пропускать некого. */
+        { key: 'on_error', label: 'При ошибке', type: 'select', default: 'fail',
+          options: [['fail','остановить'],['continue','продолжить'],['retry','повторить'],['route','увести по проводу']] },
       ],
       summary: p => {
         const n = String(p.checklist || '').split('\n').filter(s => s.trim()).length;

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""chat_proxy.py — эгресс-прокси движка для чата Bench.
+"""chat_proxy.py — эгресс-прокси движка для чата конструктора Tester.
 
 Зачем: облачные LLM-API (OpenAI/Anthropic/совместимые) не пускают браузер
 напрямую (CORS). Браузер шлёт запрос сюда, на localhost; прокси форвардит его
@@ -225,7 +225,7 @@ class Proxy(BaseHTTPRequestHandler):
                 project = _bridge_plan["project"]
                 cur = _pid(project)
                 if not cur:
-                    return self._json(409, {"error": "конструктор ещё не представился: открой Bench "
+                    return self._json(409, {"error": "конструктор ещё не представился: открой Bench"
                                                      "и включи «Сопряжение», тогда мост узнает проект"})
                 if claim and claim != cur:
                     return self._json(409, {
@@ -314,9 +314,8 @@ class Proxy(BaseHTTPRequestHandler):
 def run(port=None):
     """Поднять прокси (блокирующе). Зовётся из __main__ и из serve.py в фоне-потоке."""
     p = port or PORT
-    bind = os.environ.get("TESTER_PROXY_BIND", "127.0.0.1")   # в Docker = 0.0.0.0 (доступ с хоста через маппинг)
-    srv = ThreadingHTTPServer((bind, p), Proxy)
-    print("tester chat-proxy: http://%s:%d  (форвард на X-Upstream-Url, +CORS)" % (bind, p))
+    srv = ThreadingHTTPServer(("127.0.0.1", p), Proxy)
+    print("tester chat-proxy: http://127.0.0.1:%d  (форвард на X-Upstream-Url, +CORS)" % p)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

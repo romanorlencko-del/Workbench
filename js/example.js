@@ -9,7 +9,7 @@ window.EXAMPLE = {
   name: 'Bench — устройство конструктора',
   meta: {
     description: 'Карта самого конструктора: из чего он собран, что делает каждая подсистема и где что хранится. Ветки «Выбора» — пять сценариев работы: собрать схему, проверить, прогнать, позвать ИИ, сохранить.',
-    workdir: 'C:\\Users\\user\\Desktop\\Tester',
+    workdir: '{{env.WORKDIR}}',
     max_parallel: 4,
     log_level: 'info',
     stage: 'plan',

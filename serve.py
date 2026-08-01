@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""serve.py — единый запуск Bench: статика + сохранение планов + прокси движка.
+"""serve.py — единый запуск конструктора Tester: статика + сохранение планов + прокси движка.
 
 Поднимает статический сервер конструктора (порт TESTER_PORT, по умолчанию 8791),
 принимает автосохранение планов на диск (папка projects/, эндпоинты /api/*) и
@@ -30,6 +30,7 @@ import time
 import socket
 import string
 import functools
+import webbrowser
 import collections
 import threading
 import subprocess
@@ -37,6 +38,7 @@ import urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 import chat_proxy   # лежит в той же папке
+import update       # обновление движка из GitHub — тоже рядом
 
 # Обычный запуск: статика и папка проектов лежат рядом со скриптом. Сборка
 # PyInstaller (--onefile): статика распакована во временный _MEIPASS, но планы
@@ -279,6 +281,15 @@ class Handler(SimpleHTTPRequestHandler):
 
     timeout = 30   # зависшее соединение не держит поток вечно
 
+    def end_headers(self):
+        # Статика правится прямо во время работы. js браузер подхватывал (в src
+        # подставлена метка времени), а index.html и style.css держал из кэша —
+        # и правки показывались вперемешку: разметка новая, стили старые.
+        # Это путает сильнее, чем отсутствие кэша вовсе: конструктор локальный,
+        # экономить на повторной отдаче нескольких файлов тут нечего.
+        self.send_header("Cache-Control", "no-store, must-revalidate")
+        super().end_headers()
+
     def _json(self, code, obj):
         if code >= 400:      # свои же отказы копим для доктора, а не только отвечаем ими
             _note_error(self.path.split("?", 1)[0], (obj or {}).get("error") or code)
@@ -414,7 +425,7 @@ class Handler(SimpleHTTPRequestHandler):
         plan = _project_path(pid)
         if not plan:
             return self._json(400, {"error": "плохой id проекта"})
-        for p in (plan, _build_path(pid), _check_path(pid)):      # стройка уходит вместе с планом, иначе воскреснет чужой
+        for p in (plan, _build_path(pid), _check_path(pid)):   # спутники уходят с планом, иначе воскреснут чужими
             try:
                 os.remove(p)
             except FileNotFoundError:
@@ -551,7 +562,8 @@ class Handler(SimpleHTTPRequestHandler):
             _note_error("папка планов", e)
         try:
             count = len([n for n in os.listdir(PROJECTS_DIR)
-                         if n.endswith(".json") and not n.endswith(BUILD_SUFFIX)])
+                         if n.endswith(".json") and not n.endswith(BUILD_SUFFIX)
+                         and not n.endswith(CHECK_SUFFIX)])
         except OSError:
             count = 0
         # живость прокси меряем сокетом, а не состоянием модуля: поток мог умереть,
@@ -590,6 +602,33 @@ class Handler(SimpleHTTPRequestHandler):
             if err:
                 return self._json(500, {"error": "не выключилось: %s" % err})
         self._json(200, _autostart_state())
+
+    def _update_check(self):
+        """Есть ли новая версия. Ничего не качает и не меняет — безопасно дёргать когда угодно."""
+        try:
+            self._json(200, update.check())
+        except Exception as e:                      # noqa: BLE001 — проверка не должна ронять движок
+            _note_error("проверка обновления", e)
+            self._json(500, {"ok": False, "error": str(e)})
+
+    def _update_apply(self):
+        """Скачать и подменить файлы. Перезапуск — отдельным вызовом /api/restart:
+           пусть браузер сам решает, когда рвать связь, и покажет отчёт до того."""
+        try:
+            res = update.apply()
+        except Exception as e:                      # noqa: BLE001 — отчёт об отказе полезнее падения
+            _note_error("обновление", e)
+            return self._json(500, {"ok": False, "error": str(e)})
+        self._json(200 if res.get("ok") else 400, res)
+
+    def _update_rollback(self):
+        """Вернуть файлы из последней резервной копии."""
+        try:
+            res = update.rollback()
+        except Exception as e:                      # noqa: BLE001
+            _note_error("откат обновления", e)
+            return self._json(500, {"ok": False, "error": str(e)})
+        self._json(200 if res.get("ok") else 400, res)
 
     def _restart(self):
         """Поднять свежий процесс и уйти. Нужно после обновления кода: иначе
@@ -631,6 +670,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._fs()
         if head == "/api/workspace":
             return self._workspace()
+        if head == "/api/update":
+            return self._update_check()
         return super().do_GET()
 
     def do_POST(self):
@@ -643,6 +684,10 @@ class Handler(SimpleHTTPRequestHandler):
             return self._workspace_sync()
         if head == "/api/pickdir":
             return self._pickdir()
+        if head == "/api/update":
+            return self._update_apply()
+        if head == "/api/update/rollback":
+            return self._update_rollback()
         self._json(404, {"error": "нет такого пути"})
 
     def do_PUT(self):
@@ -672,22 +717,17 @@ def main():
     chat_proxy.ALLOWED_ORIGINS = ({o.strip() for o in allowed.split(",") if o.strip()} if allowed
                                   else {"http://localhost:%d" % PORT, "http://127.0.0.1:%d" % PORT})
     handler = functools.partial(Handler, directory=ROOT)
-    # при перезапуске из интерфейса порт ещё держит умирающий предшественник —
-    # тогда ждём его, а не сдаёмся с советом про «другую копию»
+    # порт ещё держит умирающий предшественник — при перезапуске это норма
     tries = 24 if os.environ.get("TESTER_WAIT_PORT") == "1" else 1
     httpd = None
     for i in range(tries):
         try:
             httpd = ThreadingHTTPServer((BIND, PORT), handler)
             break
-        except OSError as e:
-            if i < tries - 1:
-                time.sleep(0.5)
-                continue
-            print("Не удалось занять %s:%d — %s" % (BIND, PORT, e), file=sys.stderr)
-            print("Похоже, порт уже занят (другая копия Bench?). Закройте её или задайте "
-                  "другой порт:  TESTER_PORT=8890 py serve.py", file=sys.stderr)
-            sys.exit(1)
+        except OSError:
+            if i == tries - 1:
+                raise
+            time.sleep(0.5)
 
     # прокси поднимаем ПОСЛЕ основного порта: при перезапуске оба освобождаются
     # не одновременно, а так к моменту старта прокси предшественник уже мёртв
@@ -697,12 +737,13 @@ def main():
         print("ВНИМАНИЕ: сервер слушает %s — доступен из сети. Любой в этой сети сможет "
               "читать, менять и удалять ваши планы." % BIND, file=sys.stderr)
     shown = "localhost" if BIND in ("127.0.0.1", "localhost") else BIND
-    print("Bench: http://%s:%d   (планы в %s/, + прокси движка на :%d)"
+    print("tester конструктор: http://%s:%d   (планы в %s/, + прокси движка на :%d)"
           % (shown, PORT, os.path.basename(PROJECTS_DIR), chat_proxy.PORT))
-    # авто-открыть браузер (для установщика/двойного клика); TESTER_OPEN=0 отключает
-    if os.environ.get("TESTER_OPEN", "1") != "0":
-        import webbrowser
-        threading.Timer(1.0, lambda: webbrowser.open("http://%s:%d" % (shown, PORT))).start()
+    if os.environ.get("TESTER_OPEN") == "1":
+        # автозапуск с галочкой «открывать браузер»: ждём, пока сервер начнёт отвечать
+        threading.Thread(target=lambda: (time.sleep(1.0),
+                                         webbrowser.open("http://%s:%d" % (shown, PORT))),
+                         name="open-browser", daemon=True).start()
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

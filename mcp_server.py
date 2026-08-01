@@ -83,6 +83,27 @@ def _warns_text():
             + "\nПеречитай план (get_plan) и почини эти места.")
 
 
+def _checklist_text(chk):
+    """Чек-лист проекта приезжает вместе с планом. Смысл — чтобы инструмент
+       ПРЕДЛОЖИЛ проработку сам: человек уже отметил, что для него важно, и
+       начинать с чистого листа поверх этого — терять его работу."""
+    if not isinstance(chk, dict):
+        return ""
+    pend = chk.get("pending") or []
+    if not pend:
+        return "\n\nЧек-лист проекта: непроработанных пунктов не отмечено."
+    lines = ["", "",
+             "ЧЕК-ЛИСТ ПРОЕКТА (профиль %s) - нужно проработать: %d" % (chk.get("profile") or "?", len(pend)),
+             "Предложи человеку пройти их по порядку этапов (Э1 -> Э7) либо честно скажи, что делаешь с нуля.",
+             "По каждому пункту отвечай конкретно: какие блоки и связи он добавляет в план."]
+    for i in pend[:40]:
+        lines.append("- [%s] %s%s" % (i.get("stage") or "?", i.get("title") or i.get("id") or "?",
+                                      (" (решение: %s)" % i["note"]) if i.get("note") else ""))
+    if len(pend) > 40:
+        lines.append("- ... ещё %d" % (len(pend) - 40))
+    return "\n".join(lines)
+
+
 def _push_ops(ops):
     body = dict(ops)
     if _state["project"]:
@@ -145,6 +166,31 @@ TOOLS = [
         "description": ("Показать текущий план конструктора: блоки (id, тип, имя) и связи. "
                         "Зови ПЕРЕД правками, чтобы знать реальные id блоков."),
         "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "get_checklist",
+        "description": ("Чек-лист проработки проекта: что человек отметил как «нужно проработать». "
+                        "Зови ПЕРЕД тем, как предлагать план с нуля: если пункты отмечены, "
+                        "предложи пройти их по этапам, а не начинать заново."),
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "set_checklist",
+        "description": ("Отметить пункты чек-листа. state: todo — нужно проработать, "
+                        "done — проработано, off — снять отметку. note — одна строка «что решили и почему». "
+                        "id брать из get_checklist, выдумывать нельзя. Отмечай done только после того, "
+                        "как пункт РЕАЛЬНО отражён в плане блоками и связями."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "items": {"type": "array", "description": "[{id, state?, note?}] — что менять",
+                          "items": {"type": "object", "properties": {
+                              "id": {"type": "string"},
+                              "state": {"type": "string", "description": "todo | done | off"},
+                              "note": {"type": "string", "description": "строка решения"}}}},
+            },
+            "required": ["items"],
+        },
     },
     {
         "name": "add_block",
@@ -259,7 +305,22 @@ def call_tool(name, args):
     if name == "get_plan":
         res = _engine("GET", "/bridge/plan")
         _remember(res.get("project"))
-        return _digest_plan(res.get("plan"), res.get("project")) + _warns_text()
+        return (_digest_plan(res.get("plan"), res.get("project"))
+                + _checklist_text(res.get("checklist")) + _warns_text())
+    if name == "set_checklist":
+        items = args.get("items")
+        if not isinstance(items, list) or not items:
+            return "нужен список items: [{id, state?, note?}]. id брать из get_checklist"
+        bad = [i for i in items if not isinstance(i, dict) or not i.get("id")]
+        if bad:
+            return "у каждого пункта обязателен id (%d без него)" % len(bad)
+        return _push_ops({"checklist": items})
+    if name == "get_checklist":
+        res = _engine("GET", "/bridge/plan")
+        _remember(res.get("project"))
+        txt = _checklist_text(res.get("checklist")).strip()
+        return txt or ("Чек-лист пуст или конструктор его ещё не прислал. "
+                       "Открой Bench, вкладку «Чек-лист» в консоли и отметь, что нужно проработать.")
     if name == "add_block":
         if not args.get("type"):
             return "нужен type блока"

@@ -57,6 +57,8 @@ WIN_RESERVED = ({"CON", "PRN", "AUX", "NUL"}
                 | {"LPT%d" % i for i in range(1, 10)})
 MAX_BODY = 8 * 1024 * 1024                      # потолок на план — 8 МБ, чтобы не раздуть память
 BUILD_SUFFIX = ".build.json"                    # состояние стройки — соседний файл того же проекта
+CHECK_SUFFIX = ".checklist.json"                # отметки чек-листа — тоже рядом, но НЕ в плане:
+#                                                 готовый проект выгружается без чек-листа
 
 
 def _safe_path(pid, suffix):
@@ -77,6 +79,10 @@ def _project_path(pid):
 def _build_path(pid):
     # точка в id запрещена регуляркой, поэтому planом нельзя перезаписать стройку и наоборот
     return _safe_path(pid, BUILD_SUFFIX)
+
+
+def _check_path(pid):
+    return _safe_path(pid, CHECK_SUFFIX)
 
 
 MARKER = ".bench-project.json"     # метка в папке сборки: чья она
@@ -167,6 +173,107 @@ def _pick_dir_native(start):
     return None, "диалог вернул неожиданное: %s" % (tail[:120] or "пусто")
 
 
+AUTOSTART_NAME = "Bench.vbs" if os.name == "nt" else "bench.desktop"
+
+
+def _autostart_dir():
+    """Папка автозагрузки текущего пользователя. Прав администратора не нужно,
+       и человек может удалить файл руками — это и будет выключением."""
+    if os.name == "nt":
+        base = os.environ.get("APPDATA")
+        return os.path.join(base, "Microsoft", "Windows", "Start Menu", "Programs", "Startup") if base else None
+    if sys.platform.startswith("linux"):
+        return os.path.join(os.path.expanduser("~"), ".config", "autostart")
+    return None                                    # macOS и прочее — честно скажем «не умею»
+
+
+def _autostart_file():
+    d = _autostart_dir()
+    return os.path.join(d, AUTOSTART_NAME) if d else None
+
+
+def _run_command():
+    """Чем поднимать движок. Путь берём у самих себя, а не угадываем: копий
+       конструктора на машине может быть несколько (исходник, канон, .exe).
+       На Windows зовём pythonw — иначе при каждом входе висело бы чёрное окно."""
+    if getattr(sys, "frozen", False):
+        return [sys.executable], os.path.dirname(sys.executable)
+    exe = sys.executable
+    if os.name == "nt":
+        w = os.path.join(os.path.dirname(exe), "pythonw.exe")
+        if os.path.exists(w):
+            exe = w
+    here = os.path.abspath(__file__)
+    return [exe, here], os.path.dirname(here)
+
+
+def _autostart_state():
+    path, (cmd, cwd) = _autostart_file(), _run_command()
+    on, open_browser = bool(path and os.path.exists(path)), False
+    if on:
+        txt = ""
+        for enc in ("utf-16", "utf-8-sig"):        # .vbs пишем в utf-16, .desktop в utf-8
+            try:
+                with open(path, "r", encoding=enc) as f:
+                    txt = f.read()
+                break
+            except (OSError, UnicodeError):
+                continue
+        open_browser = ('"TESTER_OPEN") = "1"' in txt) or ("TESTER_OPEN=1" in txt)
+    return {"supported": bool(path), "on": on, "path": path, "dir": _autostart_dir(),
+            "command": " ".join(cmd), "cwd": cwd, "open_browser": open_browser,
+            "frozen": bool(getattr(sys, "frozen", False))}
+
+
+def _autostart_write(open_browser):
+    """Кладём запускатель в автозагрузку. На Windows это .vbs, а не .cmd: .cmd
+       на секунду показал бы консольное окно при каждом входе в систему."""
+    path = _autostart_file()
+    if not path:
+        return None, "автозапуск умеем только на Windows и Linux"
+    cmd, cwd = _run_command()
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        if os.name == "nt":
+            # в VBS кавычка внутри строки удваивается: получаем "путь" "аргумент"
+            run_arg = '"%s"' % " ".join('""%s""' % c for c in cmd)
+            body = ("' Автозапуск Bench. Файл создан самим движком: кнопка «✦ ИИ» -> «Движок».\n"
+                    "' Удалить можно прямо отсюда — автозапуск на этом и выключится.\n"
+                    'Set s = CreateObject("WScript.Shell")\n'
+                    # .Item(...) явно: присваивание через скобки VBScript трактует неоднозначно
+                    's.Environment("Process").Item("TESTER_OPEN") = "%s"\n'
+                    's.CurrentDirectory = "%s"\n'
+                    "s.Run %s, 0, False\n" % ("1" if open_browser else "0", cwd, run_arg))
+            # ТОЛЬКО UTF-16LE. От UTF-8 BOM движок скриптов падает на первом же
+            # символе («недопустимый символ», строка 1) — и падает МОЛЧА, потому
+            # что при входе в систему консоли нет. Проверено вживую.
+            with open(path, "w", encoding="utf-16") as f:
+                f.write(body)
+        else:
+            body = ("[Desktop Entry]\nType=Application\nName=Bench\n"
+                    "Comment=Конструктор конвейеров\n"
+                    "Exec=env TESTER_OPEN=%s %s\nX-GNOME-Autostart-enabled=true\n"
+                    % ("1" if open_browser else "0", " ".join(cmd)))
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(body)
+        return path, None
+    except OSError as e:
+        return None, str(e)
+
+
+def _autostart_remove():
+    path = _autostart_file()
+    if not path:
+        return "автозапуск здесь не поддержан"
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass                                       # уже выключен — это не ошибка
+    except OSError as e:
+        return str(e)
+    return None
+
+
 class Handler(SimpleHTTPRequestHandler):
     """Статика как раньше + /api для сохранения планов на диск."""
 
@@ -210,8 +317,8 @@ class Handler(SimpleHTTPRequestHandler):
         except OSError:
             names = []
         for fn in names:
-            if not fn.endswith(".json") or fn.endswith(BUILD_SUFFIX):
-                continue                        # стройка — не план: приедет сбоку, вместе со своим планом
+            if not fn.endswith(".json") or fn.endswith(BUILD_SUFFIX) or fn.endswith(CHECK_SUFFIX):
+                continue                        # стройка и чек-лист — не планы: приедут сбоку, со своим планом
             got = self._read_json(os.path.join(PROJECTS_DIR, fn))
             if not got or not isinstance(got[0], dict):
                 continue
@@ -220,6 +327,9 @@ class Handler(SimpleHTTPRequestHandler):
             build = self._read_json(_build_path(pid))
             if build and isinstance(build[0], dict):
                 item["build"], item["buildMtime"] = build[0], build[1]
+            check = self._read_json(_check_path(pid))
+            if check and isinstance(check[0], dict):
+                item["checklist"], item["checklistMtime"] = check[0], check[1]
             out.append(item)
         self._json(200, {"projects": out})
 
@@ -293,12 +403,18 @@ class Handler(SimpleHTTPRequestHandler):
                   lambda d: isinstance(d, dict) and isinstance(d.get("nodes"), dict),
                   "не похоже на состояние стройки (нет объекта nodes)")
 
+    def _save_check(self):
+        # у чек-листа items — объект (id пункта → отметка): с планом и стройкой не спутать
+        self._put(_check_path(self._tail("/api/checklist/")),
+                  lambda d: isinstance(d, dict) and isinstance(d.get("items"), dict),
+                  "не похоже на отметки чек-листа (нет объекта items)")
+
     def _delete(self):
         pid = self._tail("/api/project/")
         plan = _project_path(pid)
         if not plan:
             return self._json(400, {"error": "плохой id проекта"})
-        for p in (plan, _build_path(pid)):      # стройка уходит вместе с планом, иначе воскреснет чужой
+        for p in (plan, _build_path(pid), _check_path(pid)):      # стройка уходит вместе с планом, иначе воскреснет чужой
             try:
                 os.remove(p)
             except FileNotFoundError:
@@ -460,12 +576,57 @@ class Handler(SimpleHTTPRequestHandler):
             "errors": list(ERRORS),
         })
 
+    def _autostart_get(self):
+        self._json(200, _autostart_state())
+
+    def _autostart_post(self):
+        data = self._body() or {}
+        if data.get("on"):
+            path, err = _autostart_write(bool(data.get("open_browser")))
+            if err:
+                return self._json(500, {"error": "не включилось: %s" % err})
+        else:
+            err = _autostart_remove()
+            if err:
+                return self._json(500, {"error": "не выключилось: %s" % err})
+        self._json(200, _autostart_state())
+
+    def _restart(self):
+        """Поднять свежий процесс и уйти. Нужно после обновления кода: иначе
+           движок держит старую версию до ручного перезапуска. Новый процесс
+           ждёт освобождения порта — старый отпускает его, только когда умрёт."""
+        cmd, cwd = _run_command()
+        self._json(200, {"ok": True, "command": " ".join(cmd)})
+        try:
+            self.wfile.flush()                     # ответ должен уйти ДО нашей смерти
+        except OSError:
+            pass
+
+        def go():
+            time.sleep(0.4)
+            env = dict(os.environ, TESTER_WAIT_PORT="1")
+            kw = {"cwd": cwd, "env": env, "close_fds": True}
+            if os.name == "nt":
+                kw["creationflags"] = 0x00000008 | 0x00000200   # DETACHED_PROCESS | NEW_PROCESS_GROUP
+            else:
+                kw["start_new_session"] = True
+            try:
+                subprocess.Popen(cmd, **kw)
+            except OSError as e:
+                _note_error("перезапуск", e)
+                return
+            os._exit(0)
+
+        threading.Thread(target=go, name="restart", daemon=True).start()
+
     def do_GET(self):
         head = self.path.split("?", 1)[0]
         if head == "/api/state":
             return self._state()
         if head == "/api/doctor":
             return self._doctor()
+        if head == "/api/autostart":
+            return self._autostart_get()
         if head == "/api/fs":
             return self._fs()
         if head == "/api/workspace":
@@ -474,6 +635,10 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         head = self.path.split("?", 1)[0]
+        if head == "/api/autostart":
+            return self._autostart_post()
+        if head == "/api/restart":
+            return self._restart()
         if head == "/api/workspace":
             return self._workspace_sync()
         if head == "/api/pickdir":
@@ -485,6 +650,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._save()
         if self.path.startswith("/api/build/"):
             return self._save_build()
+        if self.path.startswith("/api/checklist/"):
+            return self._save_check()
         self._json(404, {"error": "нет такого пути"})
 
     def do_DELETE(self):
@@ -504,17 +671,27 @@ def main():
     allowed = os.environ.get("TESTER_ALLOWED_ORIGINS")   # для Docker/нестандартного хоста
     chat_proxy.ALLOWED_ORIGINS = ({o.strip() for o in allowed.split(",") if o.strip()} if allowed
                                   else {"http://localhost:%d" % PORT, "http://127.0.0.1:%d" % PORT})
-    # прокси движка — в демон-потоке: гаснет вместе с конструктором
-    threading.Thread(target=chat_proxy.run, name="chat-proxy", daemon=True).start()
-
     handler = functools.partial(Handler, directory=ROOT)
-    try:
-        httpd = ThreadingHTTPServer((BIND, PORT), handler)
-    except OSError as e:
-        print("Не удалось занять %s:%d — %s" % (BIND, PORT, e), file=sys.stderr)
-        print("Похоже, порт уже занят (другая копия Bench?). Закройте её или задайте "
-              "другой порт:  TESTER_PORT=8890 py serve.py", file=sys.stderr)
-        sys.exit(1)
+    # при перезапуске из интерфейса порт ещё держит умирающий предшественник —
+    # тогда ждём его, а не сдаёмся с советом про «другую копию»
+    tries = 24 if os.environ.get("TESTER_WAIT_PORT") == "1" else 1
+    httpd = None
+    for i in range(tries):
+        try:
+            httpd = ThreadingHTTPServer((BIND, PORT), handler)
+            break
+        except OSError as e:
+            if i < tries - 1:
+                time.sleep(0.5)
+                continue
+            print("Не удалось занять %s:%d — %s" % (BIND, PORT, e), file=sys.stderr)
+            print("Похоже, порт уже занят (другая копия Bench?). Закройте её или задайте "
+                  "другой порт:  TESTER_PORT=8890 py serve.py", file=sys.stderr)
+            sys.exit(1)
+
+    # прокси поднимаем ПОСЛЕ основного порта: при перезапуске оба освобождаются
+    # не одновременно, а так к моменту старта прокси предшественник уже мёртв
+    threading.Thread(target=chat_proxy.run, name="chat-proxy", daemon=True).start()
 
     if BIND not in ("127.0.0.1", "localhost"):
         print("ВНИМАНИЕ: сервер слушает %s — доступен из сети. Любой в этой сети сможет "

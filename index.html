@@ -134,6 +134,7 @@
       <button class="ctab" data-tab="check">Проверка <span id="check-count" class="pill"></span></button>
       <button class="ctab" data-tab="json">JSON</button>
       <button class="ctab" data-tab="doctor" title="Ошибки инструмента и состояние окружения — не путать с «Проверкой» плана">Доктор <span id="doc-count" class="pill"></span></button>
+      <button class="ctab" data-tab="checklist" title="Что нужно проработать в проекте — отметки галочками, свои пункты">Чек-лист <span id="chk-count" class="pill"></span></button>
       <div class="console-actions">
         <button class="tb icon" data-act="console-toggle" id="console-toggle" title="Свернуть">▾</button>
       </div>
@@ -143,6 +144,7 @@
       <div class="ctab-panel" id="tab-check"></div>
       <div class="ctab-panel" id="tab-json"></div>
       <div class="ctab-panel" id="tab-doctor"></div>
+      <div class="ctab-panel" id="tab-checklist"></div>
     </div>
   </footer>
 
@@ -154,6 +156,7 @@
     <div class="chat-head">
       <span class="chat-title">✦ Чат с ИИ</span>
       <select id="chat-model" class="chat-model" title="Какая модель отвечает"></select>
+      <button class="tb" data-act="chat-checklist" title="Дать агенту чек-лист проекта: что отмечено как «нужно проработать»">✓ чек-лист</button>
       <button class="tb" data-act="chat-compact" title="Сжать разговор в короткую сводку — контекст экономится, суть остаётся">сжать</button>
       <button class="tb" data-act="chat-clear" title="Очистить историю чата (проект ИИ по-прежнему видит)">очистить</button>
       <button class="tb icon" data-act="chat-min" id="chat-min" title="Свернуть в заголовок">─</button>
@@ -166,6 +169,25 @@
     </form>
   </section>
   <button class="chat-launcher" id="chat-launcher" data-act="chat-open" title="Чат с ИИ">✦ <span class="cl-txt">Чат с ИИ</span></button>
+
+  <!-- новый проект: предложить чек-лист сразу, пока не начали рисовать блоки -->
+  <div class="chkstart" id="chkstart" hidden>
+    <div class="chkstart-card">
+      <h3>Проработать проект по чек-листу?</h3>
+      <p class="micro dim">Список того, что стоит решить до кода: рамки, данные, ИИ-ядро, интерфейсы, надёжность, выпуск.
+        Отметьте нужное — и агент будет видеть, что ещё не проработано. Можно пропустить и вернуться в любой момент:
+        вкладка <b>Чек-лист</b> в консоли.</p>
+      <div class="chkstart-prof">
+        <span class="micro dim">Сначала профиль — от него зависит, половина пунктов вам нужна или нет:</span>
+        <div class="chkstart-row" id="chkstart-prof"></div>
+      </div>
+      <div class="chkstart-row">
+        <button class="tb primary" data-act="chkstart-open">Отметить пункты</button>
+        <button class="tb" data-act="chkstart-all" title="Отметить сразу все пункты профиля — лишнее снимете в списке">Отметить всё</button>
+        <button class="tb" data-act="chkstart-skip">Начну с нуля</button>
+      </div>
+    </div>
+  </div>
 
   <div class="drawer-scrim" id="drawer-scrim" data-act="close-drawers" hidden></div>
 
@@ -213,7 +235,7 @@
    после правок. async=false сохраняет порядок выполнения. */
 ['js/blocks.js', 'js/example.js', 'js/pipeline.js', 'js/graph.js', 'js/build.js',
  'js/collide.js', 'js/harness.js', 'js/editor.js', 'js/inspector.js', 'js/doctor.js',
- 'js/app.js'].forEach(src => {
+ 'js/checklist.js', 'js/app.js'].forEach(src => {
   const s = document.createElement('script');
   s.src = src + '?t=' + Date.now();
   s.async = false;

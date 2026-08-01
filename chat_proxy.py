@@ -187,7 +187,8 @@ class Proxy(BaseHTTPRequestHandler):
         if self.path.startswith("/bridge/plan"):
             with _bridge_lock:
                 plan, project = _bridge_plan["json"], _bridge_plan["project"]
-            return self._json(200, {"plan": plan, "project": project})
+                checklist = _bridge_plan.get("checklist")
+            return self._json(200, {"plan": plan, "project": project, "checklist": checklist})
         if self.path.startswith("/bridge/task"):
             # не вычищаем: исполнитель имеет право перечитать задание в середине работы.
             # Чужие проекты не показываем вовсе — нельзя взять работу не из той схемы.
@@ -256,6 +257,7 @@ class Proxy(BaseHTTPRequestHandler):
                 if isinstance(body, dict) and "plan" in body:
                     _bridge_plan["json"] = body.get("plan")
                     _bridge_plan["project"] = body.get("project")
+                    _bridge_plan["checklist"] = body.get("checklist")   # чек-лист едет с планом
                 else:
                     _bridge_plan["json"] = body
             return self._json(200, {"ok": True})

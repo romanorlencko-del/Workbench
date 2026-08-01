@@ -135,6 +135,8 @@ window.App = (function () {
       if (deleted.has(f.id)) return;                    // удалённый в этой сессии — не воскрешаем
       diskMtime[f.id] = f.mtime || 0;                   // помним mtime диска — его шлём в X-Prev-Mtime
       if (f.build) window.Build.hydrate(f.id, f.build, (f.buildMtime || 0) * 1000);   // стройка приезжает своим файлом
+      if (f.checklist && window.CheckState)                                           // чек-лист — тоже своим
+        window.CheckState.hydrate(f.id, f.checklist, (f.checklistMtime || 0) * 1000);
       const local = byId.get(f.id);
       const diskMs = (f.mtime || 0) * 1000;
       try {
@@ -296,6 +298,7 @@ window.App = (function () {
     if (window.Harness) window.Harness.resetManual();
     projectId = id;
     window.Build.adopt(id);                      // у каждого проекта своя стройка
+    if (window.CheckState) window.CheckState.adopt(id);   // и свой чек-лист
     localStorage.setItem(LS_CURRENT, id);
     document.getElementById('pipeline-name').value = window.Graph.state.name;
     history = []; hp = -1;
@@ -319,6 +322,7 @@ window.App = (function () {
     if (window.Harness) window.Harness.resetManual();
     projectId = id;
     window.Build.adopt(id);                      // новый проект — чистая стройка
+    if (window.CheckState) window.CheckState.adopt(id);   // и чистый чек-лист
     localStorage.setItem(LS_CURRENT, id);
     seedModelsFromGlobal(!!data, carry);         // подключение: дефолт, иначе — из покинутого проекта
     document.getElementById('pipeline-name').value = window.Graph.state.name;
@@ -327,6 +331,7 @@ window.App = (function () {
     touchRegistry(id, window.Graph.state.name || 'Без имени');
     adoptProjectChat();
     bridgePushPlan(true);        // новый проект — мост тоже должен знать
+    if (!data) chkStartShow();   // пустой проект: предложить чек-лист. Импорт и дубль не трогаем
     return id;
   }
   function duplicateProject() {
@@ -341,6 +346,7 @@ window.App = (function () {
     projectId = null;                            // чтобы автосейв не воскресил удаляемый
     try { localStorage.removeItem(LS_PROJECT + gone); localStorage.removeItem(LS_CHAT + '.' + gone); localStorage.removeItem('tester.alias.' + gone); } catch (e) {}
     window.Build.drop(gone);                     // стройка удалённого проекта — туда же
+    if (window.CheckState) window.CheckState.drop(gone);
     diskDelete(gone);                            // и с диска, чтобы удалённый проект не воскрес при загрузке (движок снимает и .build.json)
     const rest = list.filter(p => p.id !== gone);
     saveRegistry(rest);
@@ -756,6 +762,129 @@ window.App = (function () {
     document.querySelectorAll('.ctab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
     document.getElementById('app').classList.remove('console-collapsed');
     if (tab === 'doctor') renderDoctor();          // проверки живые, кэшировать их незачем
+    if (tab === 'checklist') renderChecklist();
+  }
+
+  /* ── чек-лист: что нужно проработать в проекте ─────────────────────────
+     Считается инструментом для человека: галочку ставит и тот, кто в разработке
+     не разбирается. Поэтому вместо статусов-терминов — один клик по строке,
+     гоняющий три понятных состояния. Свои пункты — для тех, кто знает своё
+     направление и видит, чего в общем списке не хватает. */
+  const CHK_MARK = { off: '·', todo: '▸', done: '✓' };
+  const CHK_WORD = { off: 'не выбран', todo: 'нужно проработать', done: 'проработано' };
+
+  function renderChecklistBadge() {
+    const el = document.getElementById('chk-count'); if (!el || !window.CheckState) return;
+    const s = window.CheckState.summary();
+    el.textContent = s.todo ? String(s.todo) : '';
+    el.classList.toggle('bad', false);
+  }
+
+  function renderChecklist() {
+    const box = document.getElementById('tab-checklist');
+    if (!box || !window.CHECKLIST || !window.CheckState) return;
+    const CS = window.CheckState, CL = window.CHECKLIST;
+    if (!CS.projectId()) { box.innerHTML = '<div class="micro dim">проект не открыт</div>'; return; }
+    const prof = CS.profile(), s = CS.summary();
+    const items = CL.forProfile(prof);
+    const shown = new Set(items.map(i => i.id));
+
+    const row = (it, own) => {
+      const st = CS.stateOf(it.id), note = CS.noteOf(it.id);
+      return `<div class="chk-row ${st}" data-id="${esc(it.id)}">
+        <button class="chk-mark" data-act="chk-cycle" data-id="${esc(it.id)}" title="${esc(CHK_WORD[st])} — нажми, чтобы сменить">${CHK_MARK[st]}</button>
+        <div class="chk-body">
+          <div class="chk-head"><b>${esc(it.title)}</b>
+            ${own ? `<span class="chk-tag own">свой${it.dir ? ' · ' + esc(it.dir) : ''}</span>`
+                  : `<span class="chk-tag" title="${esc(CL.STAGES[it.stage] || '')}">${esc(it.stage)}</span>
+                     <span class="chk-tag prof" title="${esc(CL.PROFILES[it.profile] || '')}">${esc(it.profile)}</span>`}
+            ${own ? `<button class="chk-del" data-act="chk-del" data-id="${esc(it.id)}" title="убрать свой пункт">✕</button>` : ''}
+          </div>
+          <div class="chk-desc">${esc(it.desc || '')}</div>
+          ${st === 'off' ? '' : `<input class="chk-note" data-note="${esc(it.id)}" value="${esc(note)}"
+             placeholder="что решили и почему — одна строка" spellcheck="false">`}
+        </div></div>`;
+    };
+
+    const groups = CL.GROUPS.map(g => {
+      const list = g.items.filter(i => shown.has(i.id));
+      if (!list.length) return '';
+      return `<section class="chk-group"><h4>${esc(g.title)}${g.note ? ` <i class="micro dim">${esc(g.note)}</i>` : ''}</h4>
+        ${list.map(i => row(i, false)).join('')}</section>`;
+    }).join('');
+
+    const own = (CS.data().custom || []);
+    const ownBlock = `<section class="chk-group"><h4>Свои пункты <i class="micro dim">то, чего нет в общем списке</i></h4>
+      ${own.map(c => row(c, true)).join('')}
+      <div class="chk-add">
+        <input id="chk-new-title" placeholder="что ещё нужно проработать" spellcheck="false">
+        <input id="chk-new-dir" placeholder="направление: фронтенд, безопасность…" spellcheck="false">
+        <button class="tb" data-act="chk-add">Добавить</button>
+      </div></section>`;
+
+    box.innerHTML = `<div class="chk-bar">
+        <span class="micro dim">профиль:</span>
+        ${Object.keys(CL.PROFILES).map(p =>
+          `<button class="tb ${p === prof ? 'primary' : ''}" data-act="chk-profile" data-p="${esc(p)}"
+             title="${esc(CL.PROFILES[p])}">${esc(p)}</button>`).join('')}
+        <span class="chk-sum">нужно <b>${s.todo}</b> · проработано <b>${s.done}</b> из ${s.total}</span>
+        <button class="tb" data-act="chk-copy" title="Список неотмеченного — вставить агенту">Скопировать для агента</button>
+        <button class="tb" data-act="chk-all" title="Отметить все пункты профиля как «нужно проработать». Уже проработанное не трогается">Отметить всё</button>
+        <button class="tb" data-act="chk-none" title="Снять все отметки">Снять всё</button>
+      </div>
+      <div class="chk-hint micro dim">Клик по значку слева гоняет пункт по кругу: ${CHK_MARK.off} не выбран → ${CHK_MARK.todo} нужно проработать → ${CHK_MARK.done} проработано.
+        Профиль решает, какие пункты вообще показывать: «все» — минимум для любого проекта, «публ» — полный список.</div>
+      ${groups}${ownBlock}`;
+    renderChecklistBadge();
+  }
+
+  /* Текст для агента: только то, что отмечено «нужно проработать». */
+  function checklistForAgent() {
+    const CS = window.CheckState, list = CS.pending();
+    if (!list.length) return 'В чек-листе проекта ничего не отмечено как «нужно проработать».';
+    return ['# ЧЕК-ЛИСТ ПРОЕКТА · нужно проработать',
+            `Профиль: ${CS.profile()}. Пунктов: ${list.length}.`,
+            'Проработай их в плане: для каждого предложи блоки и связи либо объясни, почему пункт закрывается иначе.',
+            '',
+            ...list.map(i => `- [${i.stage}] ${i.title} — ${i.desc}${i.note ? ` (решение: ${i.note})` : ''}${i.own ? ' [свой пункт]' : ''}`),
+           ].join('\n');
+  }
+
+  /* Новый проект — единственный момент, когда чек-лист ещё имеет смысл целиком.
+     Дальше человек уже рисует блоки, и правило «не проектируйте базу, пока не
+     решили: один пользователь или много» нарушается ровно здесь. Поэтому
+     предлагаем сразу, но пропустить можно одним нажатием. */
+  function chkStartProfiles() {
+    const row = document.getElementById('chkstart-prof');
+    if (!row || !window.CHECKLIST || !window.CheckState) return;
+    const cur = window.CheckState.profile();
+    row.innerHTML = Object.keys(window.CHECKLIST.PROFILES).map(p =>
+      `<button class="tb ${p === cur ? 'primary' : ''}" data-act="chkstart-prof" data-p="${esc(p)}"
+         title="${esc(window.CHECKLIST.PROFILES[p])}">${esc(p)} <b>${window.CHECKLIST.forProfile(p).length}</b></button>`
+    ).join('');
+  }
+  function chkStartShow() {
+    const box = document.getElementById('chkstart');
+    if (!box || !window.CHECKLIST || !window.CheckState) return;
+    chkStartProfiles();
+    box.hidden = false;
+  }
+  function chkStartHide() { const b = document.getElementById('chkstart'); if (b) b.hidden = true; }
+
+  /* Чат: положить агенту чек-лист. Сами НЕ отправляем — человек дописывает свою
+     мысль и жмёт Enter. Иначе агент получает голый список без задачи. */
+  function chatChecklist() {
+    const CS = window.CheckState;
+    openChat(true);
+    if (!CS || !CS.pending().length) {
+      switchTab('checklist');
+      return toast('В чек-листе пока нечего прорабатывать — отметь пункты во вкладке «Чек-лист»', 'warn');
+    }
+    const ta = document.getElementById('chat-text'); if (!ta) return;
+    ta.value = (ta.value.trim() ? ta.value.trim() + '\n\n' : '') + checklistForAgent();
+    ta.focus();
+    ta.selectionStart = ta.selectionEnd = ta.value.length;
+    ta.scrollTop = ta.scrollHeight;
   }
 
   /* ── доктор: ошибки инструмента и состояние окружения ──────────────────
@@ -836,6 +965,74 @@ window.App = (function () {
   function loadPaths() { try { return JSON.parse(localStorage.getItem(LS_PATHS) || '{}') || {}; } catch (e) { return {}; } }
   function savePaths(o) { try { localStorage.setItem(LS_PATHS, JSON.stringify(o)); } catch (e) {} }
   function wsRootField() { const el = document.getElementById('ws-root'); return el ? el.value.trim() : ''; }
+
+  /* ── движок: автозапуск при входе в систему и перезапуск ────────────────
+     Движок — не часть страницы: он живёт своим процессом, и до сих пор его
+     приходилось поднимать руками в терминале. Отсюда им можно управлять. */
+  let autoState = null;
+  async function loadAutostart() {
+    try {
+      const r = await fetch('api/autostart', { cache: 'no-store' });
+      autoState = r.ok ? await r.json() : null;
+    } catch (e) { autoState = null; }
+    renderAutostart();
+  }
+  function renderAutostart() {
+    const box = document.getElementById('engine-box'); if (!box) return;
+    if (!autoState) {
+      box.innerHTML = '<div class="micro warn">движок не отвечает — управлять автозапуском некому</div>';
+      return;
+    }
+    const s = autoState;
+    if (!s.supported) {
+      box.innerHTML = '<div class="micro warn">автозапуск умеем только на Windows и Linux</div>';
+      return;
+    }
+    box.innerHTML =
+      `<label class="gproxy-on"><input type="checkbox" id="as-on" ${s.on ? 'checked' : ''}> запускать движок при входе в систему</label>
+       <label class="gproxy-on"><input type="checkbox" id="as-open" ${s.open_browser ? 'checked' : ''} ${s.on ? '' : 'disabled'}> и сразу открывать конструктор в браузере</label>
+       <div class="micro dim">${s.on ? `запускатель: <code>${esc(s.path)}</code> — его можно удалить руками, автозапуск на этом и выключится`
+                                     : `будет создан файл в папке автозагрузки: <code>${esc(s.dir || '')}</code>`}</div>
+       <div class="micro dim">команда: <code>${esc(s.command)}</code>${s.frozen ? ' (собранный .exe)' : ''}</div>`;
+  }
+  async function applyAutostart() {
+    const on = document.getElementById('as-on'); if (!on) return;
+    const ob = document.getElementById('as-open');
+    try {
+      const r = await fetch('api/autostart', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                               body: JSON.stringify({ on: on.checked, open_browser: !!(ob && ob.checked) }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) return toast('Не вышло: ' + (d.error || r.status), 'err');
+      autoState = d; renderAutostart();
+      toast(d.on ? 'Автозапуск включён' : 'Автозапуск выключен', 'ok');
+    } catch (e) { toast('Движок не отвечает: ' + e.message, 'err'); }
+  }
+  /* Перезапуск: старый процесс поднимает новый и умирает. Ждём, пока свежий
+     ответит, — иначе человек не поймёт, поднялся движок или нет. */
+  async function restartEngine() {
+    if (!confirm('Перезапустить движок? Страница на несколько секунд потеряет с ним связь — правки в это время на диск не уйдут.')) return;
+    await restartEngineSilent();
+  }
+  /* Без подтверждения: обновление перезапускает движок само, и спрашивать
+     человека второй раз посреди начатого дела незачем. */
+  async function restartEngineSilent() {
+    toast('Перезапускаю движок…', 'ok');
+    try { await fetch('api/restart', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); }
+    catch (e) { /* он и должен оборвать соединение, умирая */ }
+    for (let i = 0; i < 30; i++) {
+      await new Promise(r => setTimeout(r, 700));
+      try {
+        if ((await fetch('api/doctor', { cache: 'no-store' })).ok) {
+          toast('Движок перезапущен', 'ok');
+          loadAutostart();
+          return true;
+        }
+      } catch (e) {}
+    }
+    toast('Движок не ответил за 20 секунд — загляни в «Доктор»', 'warn');
+    if (window.Doctor) window.Doctor.log('error', 'движок', 'после перезапуска не поднялся за 20 с');
+    return false;
+  }
 
   async function wsPick() {
     const inp = document.getElementById('ws-root'); if (!inp) return;
@@ -951,8 +1148,16 @@ window.App = (function () {
     const key = who.id + ':' + who.rev;
     if (!force && key === bridgeLastKey) return;
     bridgeLastKey = key;
+    /* Чек-лист едет вместе с планом, а не отдельным запросом: приложение через
+       MCP должно узнать о нём само, не догадываясь спросить. В план он при этом
+       не попадает — хранится своим файлом. */
+    const chk = (window.CheckState && window.CheckState.data())
+      ? { profile: window.CheckState.profile(),
+          pending: window.CheckState.pending().map(i => ({ id: i.id, stage: i.stage, title: i.title, note: i.note || '' })),
+          done: window.CheckState.doneCount ? window.CheckState.doneCount() : undefined }
+      : null;
     fetch(base + '/bridge/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project: who, plan: window.Graph.toJSON() }) }).catch(() => {});
+      body: JSON.stringify({ project: who, plan: window.Graph.toJSON(), checklist: chk }) }).catch(() => {});
   }
   /* Доска заданий: браузер кладёт выданное задание, приложение забирает его
      инструментом get_task. Отчёт снимает задание с доски — иначе исполнитель
@@ -1054,6 +1259,43 @@ window.App = (function () {
     else toast(`Отчёт принят: ${ok.join(', ')}`, 'ok');
   }
 
+  /* Отметки чек-листа от приложения:
+     {"checklist":[{"id":"g1_platform","state":"done","note":"Web + Android"}]}
+     В ПЛАН это не идёт — у чек-листа своё хранилище, как у стройки. */
+  function extractChecklist(item) {
+    if (!item || typeof item !== 'object' || Array.isArray(item) || !Array.isArray(item.checklist)) return null;
+    const list = item.checklist.filter(r => r && r.id);
+    return list.length ? list : null;
+  }
+  function applyChecklistOps(list) {
+    const CS = window.CheckState; if (!CS) return;
+    const ok = [], bad = [];
+    list.forEach(r => {
+      const id = String(r.id);
+      const own = (CS.data() && (CS.data().custom || []).some(c => c.id === id));
+      if (!own && !(window.CHECKLIST && window.CHECKLIST.get(id))) return void bad.push(`нет пункта ${id}`);
+      const patch = {};
+      if (r.state !== undefined) {
+        if (CS.STATES.indexOf(String(r.state)) < 0) return void bad.push(`${id}: неизвестное состояние «${r.state}»`);
+        patch.state = String(r.state);
+      }
+      if (r.note !== undefined) patch.note = String(r.note).slice(0, 500);
+      if (!Object.keys(patch).length) return void bad.push(`${id}: нечего менять`);
+      CS.setItem(id, patch);
+      ok.push(id);
+    });
+    if (ok.length) { renderChecklist(); renderChecklistBadge(); }
+    /* Промахи возвращаем на мост: приложение узнает, что отметило не то,
+       иначе оно считает дело сделанным. */
+    if (bad.length) {
+      bridgePushWarn(bad.map(x => 'чек-лист: ' + x));
+      if (window.Doctor) window.Doctor.log('warn', 'мост', `чек-лист: не применилось ${bad.length}`, bad.join(' | '));
+    }
+    if (ok.length) toast(`Чек-лист от приложения: отмечено ${ok.length}` + (bad.length ? `, мимо ${bad.length}` : ''),
+                         bad.length ? 'warn' : 'ok');
+    else if (bad.length) toast(`Чек-лист от приложения: не применилось ${bad.length} — смотри «Доктор»`, 'warn');
+  }
+
   async function bridgePoll() {
     if (bridgeBusy) return;
     const base = bridgeBase(); if (!base) return;
@@ -1068,6 +1310,8 @@ window.App = (function () {
           if (!bridgeMine(it)) return;                     // чужой проект — не наше дело
           const rep = extractBuild(it);
           if (rep) return applyBuildReports(rep);          // это стройка, а не замысел — план не трогаем
+          const chk = extractChecklist(it);
+          if (chk) return applyChecklistOps(chk);          // и чек-лист тоже мимо плана
           const ops = extractOps(JSON.stringify(it));
           if (ops) { applyOpsFromChat(ops, { silent: true }); applied++; }
         });
@@ -1256,7 +1500,13 @@ window.App = (function () {
       </div>
       <div class="ws-tree" id="ws-tree" hidden></div>
       <div class="micro dim" id="ws-info"></div></div>`;
-    document.getElementById('guide-models').innerHTML = modelsHTML + wsBlock + proxyBlock + bridgeBlock;
+    const engineBlock = `<div class="gmodel"><div class="gmodel-h">Движок · автозапуск и перезапуск</div>
+      <div id="engine-box"><div class="micro dim">читаю…</div></div>
+      <div class="mcp-apps">
+        <button class="tb" data-act="engine-restart" title="Поднять свежий процесс — нужно после обновления кода">Перезапустить движок</button>
+      </div></div>`;
+    document.getElementById('guide-models').innerHTML = modelsHTML + engineBlock + wsBlock + proxyBlock + bridgeBlock;
+    loadAutostart();
     renderWsInfo();
     updateMcpView();
     const mp = document.getElementById('mcp-path');
@@ -2413,6 +2663,10 @@ window.App = (function () {
     window.Build.onChange(() => { window.Editor.render(); renderBuildCount(); renderQueue(); });
     /* доктор должен видеть состояние приложения, а вкладка — счётчик ошибок */
     if (window.Doctor) { window.Doctor.context(doctorContext); window.Doctor.onChange(renderDoctorBadge); renderDoctorBadge(); }
+    /* Привязка к проекту — НИЖЕ, когда projectId уже выбран. Здесь он ещё null,
+       и adopt(null) оставлял чек-лист без хранилища: любая отметка молча
+       пропадала, потому что писать было некуда. */
+    if (window.CheckState) window.CheckState.onChange(renderChecklistBadge);
     window.Inspector.init({ onChange: () => {
       window.Graph.pruneEdges();          // порты могли исчезнуть после правки параметров
       commit(); window.Editor.render(); renderConsole();
@@ -2443,6 +2697,7 @@ window.App = (function () {
     try { window.Graph.fromJSON(JSON.parse(localStorage.getItem(LS_PROJECT + projectId))); }
     catch (e) { window.Graph.fromJSON(window.PIPELINE); }
     window.Build.adopt(projectId);         // стройка текущего проекта — после подхвата с диска
+    if (window.CheckState) window.CheckState.adopt(projectId);   // и чек-лист: иначе отметки некуда писать
     document.getElementById('pipeline-name').value = window.Graph.state.name;
 
     renderPalette('');
@@ -2540,6 +2795,12 @@ window.App = (function () {
       if (b.dataset.act === 'zoom-reset') window.Editor.fit();
     });
 
+    /* строка решения по пункту чек-листа — пишем по уходу из поля, а не на каждой букве */
+    document.getElementById('tab-checklist').addEventListener('change', e => {
+      const id = e.target.dataset && e.target.dataset.note;
+      if (id) window.CheckState.setItem(id, { note: e.target.value });
+    });
+
     /* консоль */
     document.querySelector('.console-tabs').addEventListener('click', e => {
       const t = e.target.closest('.ctab');
@@ -2568,6 +2829,7 @@ window.App = (function () {
 
     /* выбор модели из загруженного списка → в поле «Модель» */
     document.getElementById('guide-models').addEventListener('change', e => {
+      if (e.target.id === 'as-on' || e.target.id === 'as-open') return applyAutostart();
       const sel = e.target.closest('.gmodels-list'); if (!sel) return;
       const inp = document.querySelector(`#guide-models input[data-ref="${sel.dataset.ref}"][data-key="model"]`);
       if (inp && sel.value) inp.value = sel.value;
@@ -2603,6 +2865,38 @@ window.App = (function () {
       else if (a === 'close-drawers') closePalette();
       else if (a === 'close-guide') closeGuide();
       else if (a === 'guide-save-models') saveGuideModels();
+      else if (a === 'chk-cycle') { window.CheckState.cycle(b.dataset.id); renderChecklist(); }
+      else if (a === 'chk-profile') { window.CheckState.setProfile(b.dataset.p); renderChecklist(); }
+      else if (a === 'chk-del') { window.CheckState.removeCustom(b.dataset.id); renderChecklist(); }
+      else if (a === 'chk-add') {
+        const t = document.getElementById('chk-new-title'), d = document.getElementById('chk-new-dir');
+        if (!t || !t.value.trim()) return toast('Впиши, что нужно проработать', 'warn');
+        window.CheckState.addCustom({ title: t.value, dir: d ? d.value : '' });
+        renderChecklist();
+      }
+      else if (a === 'chk-none') {
+        if (!confirm('Снять все отметки чек-листа в этом проекте?')) return;
+        const CS = window.CheckState, d = CS.data();
+        Object.keys(d.items).forEach(id => CS.setItem(id, { state: 'off' }));
+        (d.custom || []).forEach(c => CS.setItem(c.id, { state: 'off' }));
+        renderChecklist();
+      }
+      else if (a === 'chk-copy') copyText(checklistForAgent(), 'Чек-лист для агента в буфере');
+      else if (a === 'chk-all') {
+        const n = window.CheckState.markAll('todo');
+        renderChecklist();
+        toast(n ? `Отмечено пунктов: ${n}` : 'Всё уже отмечено', n ? 'ok' : 'warn');
+      }
+      else if (a === 'chkstart-all') {
+        const n = window.CheckState.markAll('todo');
+        chkStartHide(); switchTab('checklist');
+        toast(`Отмечено пунктов: ${n} — снимай лишнее прямо в списке`, 'ok');
+      }
+      else if (a === 'chkstart-prof') { window.CheckState.setProfile(b.dataset.p); chkStartProfiles(); }
+      else if (a === 'chkstart-open') { chkStartHide(); switchTab('checklist'); }
+      else if (a === 'chkstart-skip') chkStartHide();
+      else if (a === 'chat-checklist') chatChecklist();
+      else if (a === 'engine-restart') restartEngine();
       else if (a === 'doc-run') renderDoctor();
       else if (a === 'doc-clear') { window.Doctor.clear(); renderDoctor(); }
       else if (a === 'doc-copy') window.Doctor.report().then(t => copyText(t, 'Отчёт доктора в буфере'));

@@ -1062,3 +1062,39 @@ textarea.code.bad{border-color:var(--err);box-shadow:0 0 0 3px rgba(248,113,113,
 .doc-line.error .doc-msg,.doc-line.net .doc-msg{color:#f87171}
 .doc-line.warn .doc-msg{color:#fbbf24}
 .pill.bad{background:#f87171;color:#111}
+
+/* ── чек-лист проработки проекта ──────────────────────────────────────── */
+.chk-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 10px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg-2);z-index:2}
+.chk-sum{margin-left:auto;font-size:12px;opacity:.8}
+.chk-sum b{font-weight:700;opacity:1}
+.chk-hint{padding:6px 10px}
+.chk-group{padding:4px 10px 10px}
+.chk-group h4{margin:10px 0 6px;font-size:13px;font-weight:700}
+.chk-row{display:flex;gap:8px;padding:5px 0;border-bottom:1px dashed var(--line)}
+.chk-mark{flex:none;width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:var(--bg-3);color:var(--fg);cursor:pointer;font-size:13px;line-height:1}
+.chk-row.todo .chk-mark{border-color:#fbbf24;color:#fbbf24}
+.chk-row.done .chk-mark{border-color:#34d399;color:#34d399}
+.chk-row.done .chk-body{opacity:.62}
+.chk-body{flex:1;min-width:0}
+.chk-head{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}
+.chk-head b{font-weight:600;font-size:13px}
+.chk-tag{font-size:10px;padding:1px 5px;border-radius:5px;background:var(--bg-3);opacity:.8}
+.chk-tag.prof{opacity:.6}
+.chk-tag.own{background:#8b7cf6;color:#fff;opacity:.9}
+.chk-del{margin-left:auto;border:0;background:none;color:var(--fg);opacity:.45;cursor:pointer}
+.chk-del:hover{opacity:1;color:#f87171}
+.chk-desc{font-size:12px;opacity:.72;margin-top:1px}
+.chk-note{width:100%;margin-top:4px;padding:3px 7px;border:1px solid var(--line);border-radius:6px;background:var(--bg-2);color:var(--fg);font:inherit;font-size:12px}
+.chk-add{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.chk-add input{flex:1;min-width:160px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg-2);color:var(--fg);font:inherit;font-size:12px}
+
+/* ── чек-лист при создании проекта: предложение, а не преграда ─────────── */
+.chkstart{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:rgba(0,0,0,.55)}
+.chkstart[hidden]{display:none}
+.chkstart-card{width:min(560px,calc(100vw - 32px));background:var(--bg-2);border:1px solid var(--line);
+  border-radius:14px;padding:18px 20px;box-shadow:0 24px 60px rgba(0,0,0,.45)}
+.chkstart-card h3{margin:0 0 6px;font-size:17px}
+.chkstart-card p{margin:0 0 12px;line-height:1.5}
+.chkstart-prof{margin-bottom:14px}
+.chkstart-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.chkstart-row .tb b{opacity:.6;font-weight:600}

@@ -1,0 +1,948 @@
+<title>Кофейный пояс Земли</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@700;800&display=swap">
+<style>
+/* Layout: control bar → map with a sticky "terroir passport" beside it → harvest calendar and process mix → process reference cards.
+   Palette: green-coffee grey ground, espresso ink, roast ramp for magnitudes, cherry red for focus. Stencil face = sack markings. */
+:root {
+  --bg: #eff1eb;
+  --surface: #fbfbf8;
+  --ink: #24170f;
+  --ink-2: #5a4d44;
+  --muted: #847a72;
+  --line: #d9d9cf;
+  --land: #dfe1d8;
+  --land-edge: #fbfbf8;
+  --grow: #cfd8bd;
+  --belt: rgba(140, 92, 52, 0.07);
+  --accent: #a8322d;
+  --roast-lo: #eddcc2;
+  --roast-hi: #3a2213;
+  --cal-0: #e7e8e0;
+  --cal-1: #e2c8a4;
+  --cal-2: #b07b4f;
+  --cal-3: #4a2a17;
+  --p-washed: #2a78d6;
+  --p-natural: #eb6834;
+  --p-special: #1baf7a;
+  --p-honey: #eda100;
+  --on-fill: #170e08;
+  --chip-on-bg: #24170f;
+  --chip-on-fg: #fbfbf8;
+  --shadow: 0 1px 2px rgba(36, 23, 15, 0.06), 0 8px 24px rgba(36, 23, 15, 0.06);
+
+  --f-display: "Unbounded", "Golos Text", system-ui, sans-serif;
+  --f-body: "Golos Text", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-stencil: "Big Shoulders Stencil Display", "Big Shoulders Stencil", "Arial Narrow", "Roboto Condensed", sans-serif;
+
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14110f;
+    --surface: #1d1916;
+    --ink: #f1eae2;
+    --ink-2: #c9bdb2;
+    --muted: #92877e;
+    --line: #342d28;
+    --land: #2b2521;
+    --land-edge: #1d1916;
+    --grow: #3a3f2c;
+    --belt: rgba(237, 190, 142, 0.05);
+    --accent: #e46c5f;
+    --roast-lo: #4a3527;
+    --roast-hi: #f0c393;
+    --cal-0: #28221e;
+    --cal-1: #5b4130;
+    --cal-2: #a8754c;
+    --cal-3: #f0c393;
+    --p-washed: #3987e5;
+    --p-natural: #d95926;
+    --p-special: #199e70;
+    --p-honey: #c98500;
+    --on-fill: #140d08;
+    --chip-on-bg: #f1eae2;
+    --chip-on-fg: #14110f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14110f;
+  --surface: #1d1916;
+  --ink: #f1eae2;
+  --ink-2: #c9bdb2;
+  --muted: #92877e;
+  --line: #342d28;
+  --land: #2b2521;
+  --land-edge: #1d1916;
+  --grow: #3a3f2c;
+  --belt: rgba(237, 190, 142, 0.05);
+  --accent: #e46c5f;
+  --roast-lo: #4a3527;
+  --roast-hi: #f0c393;
+  --cal-0: #28221e;
+  --cal-1: #5b4130;
+  --cal-2: #a8754c;
+  --cal-3: #f0c393;
+  --p-washed: #3987e5;
+  --p-natural: #d95926;
+  --p-special: #199e70;
+  --p-honey: #c98500;
+  --on-fill: #140d08;
+  --chip-on-bg: #f1eae2;
+  --chip-on-fg: #14110f;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 15px;
+  line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 56px;
+}
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 22px; }
+
+/* Header */
+header { display: grid; gap: 8px; }
+.eyebrow {
+  font-family: var(--f-stencil); font-weight: 800; font-size: 15px;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent);
+}
+h1 {
+  font-family: var(--f-display); font-weight: 600;
+  font-size: clamp(24px, 3.4vw, 38px); line-height: 1.12; margin: 0;
+  text-wrap: balance; letter-spacing: -0.01em;
+}
+.lede { margin: 0; color: var(--ink-2); max-width: 70ch; }
+.lede b { color: var(--ink); font-weight: 600; }
+
+/* Summary strip */
+.stats { display: flex; flex-wrap: wrap; gap: 10px 28px; align-items: baseline; padding-top: 4px; }
+.stat { display: grid; gap: 0; }
+.stat .k { font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.stat .v { font-family: var(--f-stencil); font-weight: 800; font-size: 30px; line-height: 1.05; letter-spacing: 0.02em; }
+.stat .v small { font-family: var(--f-body); font-weight: 500; font-size: 13px; color: var(--ink-2); letter-spacing: 0; margin-left: 3px; }
+.stat.now .v { font-family: var(--f-body); font-size: 15px; font-weight: 500; line-height: 1.35; max-width: 46ch; padding-top: 6px; }
+
+/* Controls */
+.controls {
+  display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: flex-start;
+  padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+}
+.ctrl { display: grid; gap: 8px; min-width: 0; }
+.ctrl-label { font-size: 11.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  font: inherit; font-size: 13.5px; font-weight: 500; color: var(--ink);
+  background: transparent; border: 1px solid var(--line); border-radius: 999px;
+  padding: 5px 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.chip:hover { border-color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--chip-on-bg); color: var(--chip-on-fg); border-color: var(--chip-on-bg); }
+.chip .n { font-variant-numeric: tabular-nums; opacity: .7; font-size: 12px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; box-shadow: 0 0 0 1.5px var(--surface); }
+.chip[aria-pressed="true"] .dot { box-shadow: 0 0 0 1.5px var(--chip-on-fg); }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button {
+  font: inherit; font-size: 13.5px; font-weight: 500; color: var(--ink-2);
+  background: transparent; border: 0; padding: 6px 12px; cursor: pointer;
+  border-right: 1px solid var(--line);
+}
+.seg button:last-child { border-right: 0; }
+.seg button:hover { color: var(--ink); background: var(--bg); }
+.seg button[aria-pressed="true"] { background: var(--chip-on-bg); color: var(--chip-on-fg); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Panels */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; min-width: 0; }
+.panel h2 {
+  font-family: var(--f-display); font-weight: 500; font-size: 17px; margin: 0; line-height: 1.3; text-wrap: balance;
+}
+.panel .sub { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+.panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 20px; align-items: flex-end; margin-bottom: 12px; }
+
+/* Map + passport */
+.map-grid { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 16px; align-items: start; }
+.map-box { position: relative; }
+#map { width: 100%; height: auto; display: block; }
+#map .land { fill: var(--land); stroke: var(--land-edge); stroke-width: 0.6; }
+#map .grow { fill: var(--grow); stroke: var(--land-edge); stroke-width: 0.6; cursor: help; }
+#map .prod { fill: var(--land); cursor: pointer; stroke: var(--land-edge); stroke-width: 0.8; transition: fill .35s, opacity .35s; }
+#map .prod.sel { stroke: var(--ink); stroke-width: 1.6; }
+#map .belt { fill: var(--belt); }
+#map .tropic { stroke: var(--accent); stroke-width: 1; stroke-dasharray: 4 5; opacity: .55; fill: none; }
+#map .equator { stroke: var(--muted); stroke-width: 0.8; stroke-dasharray: 1 4; opacity: .7; fill: none; }
+#map .geo-label { font-family: var(--f-body); font-size: 11px; fill: var(--muted); letter-spacing: .02em; }
+#map .marker { cursor: pointer; transition: opacity .3s; }
+#map .marker circle.m { stroke: var(--surface); stroke-width: 2; }
+#map .marker.sel circle.m { stroke: var(--ink); stroke-width: 2.5; }
+#map .marker.dim { opacity: .14; }
+#map .marker text {
+  font-family: var(--f-stencil); font-weight: 800; font-size: 15px; letter-spacing: .06em;
+  fill: var(--ink); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; pointer-events: none;
+}
+#map .hit { fill: transparent; }
+#map .marker:focus { outline: none; }
+#map .marker:focus-visible circle.m { stroke: var(--accent); stroke-width: 3; }
+
+.legends { display: flex; flex-wrap: wrap; gap: 10px 26px; align-items: center; margin-top: 10px; font-size: 12.5px; color: var(--ink-2); }
+.legend-row { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.legend-row span { display: inline-flex; align-items: center; gap: 6px; }
+.ramp { display: grid; gap: 3px; min-width: 180px; }
+.ramp-bar { height: 8px; border-radius: 4px; }
+.ramp-ticks { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 11.5px; }
+.size-key { display: inline-flex; align-items: center; gap: 6px; }
+.grow-key { display: inline-flex; align-items: center; gap: 6px; }
+.grow-key i { width: 16px; height: 11px; border-radius: 3px; background: var(--grow); box-shadow: inset 0 0 0 1px var(--line); }
+.size-key i { display: inline-block; border-radius: 50%; border: 1.5px solid var(--muted); }
+
+/* Passport */
+.passport { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); display: grid; gap: 14px; }
+.pp-mark { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; border-bottom: 1.5px dashed var(--line); padding-bottom: 10px; }
+.pp-code { font-family: var(--f-stencil); font-weight: 800; font-size: 44px; line-height: .9; letter-spacing: .08em; color: var(--accent); }
+.pp-bag { font-family: var(--f-stencil); font-weight: 700; font-size: 14px; letter-spacing: .12em; color: var(--muted); text-align: right; text-transform: uppercase; }
+.pp-name { font-family: var(--f-display); font-weight: 600; font-size: 22px; line-height: 1.15; margin: 0; }
+.pp-region { color: var(--ink-2); font-size: 13.5px; margin: 2px 0 0; }
+.pp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+.kv { display: grid; gap: 1px; min-width: 0; }
+.kv .k { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.kv .v { font-weight: 600; font-variant-numeric: tabular-nums; }
+.kv .v small { font-weight: 400; color: var(--ink-2); }
+.split { display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 2px; margin-top: 4px; background: var(--surface); }
+.split i { display: block; height: 100%; }
+.pp-sec { display: grid; gap: 5px; }
+.pp-sec .k { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.pp-sec p { margin: 0; font-size: 14px; }
+.tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.tag { font-size: 12.5px; padding: 2px 8px; border-radius: 4px; background: var(--bg); border: 1px solid var(--line); }
+.mini-cal { display: grid; grid-template-columns: repeat(12, 1fr); gap: 2px; }
+.mini-cal div { height: 18px; border-radius: 3px; }
+.mini-cal-lbl { display: grid; grid-template-columns: repeat(12, 1fr); gap: 2px; font-size: 10px; color: var(--muted); text-align: center; }
+.mini-cal-lbl .cur { color: var(--accent); font-weight: 600; }
+.mix { display: flex; gap: 2px; height: 22px; }
+.mix i { display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 11px; font-weight: 600; color: var(--on-fill); overflow: hidden; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mix i:first-child { border-radius: 4px 0 0 4px; }
+.mix i:last-child { border-radius: 0 4px 4px 0; }
+.mix i:only-child { border-radius: 4px; }
+.pp-hint { font-size: 12px; color: var(--muted); margin: 0; }
+
+/* Tooltip */
+#tip {
+  position: fixed; z-index: 30; pointer-events: none; max-width: 260px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: var(--shadow); padding: 8px 10px; font-size: 13px; line-height: 1.4;
+}
+#tip b { font-weight: 600; }
+#tip .t-row { display: flex; align-items: center; gap: 6px; color: var(--ink-2); }
+
+/* Trend */
+.trend-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 20px; align-items: start; }
+.trend-main { display: grid; gap: 8px; min-width: 0; }
+.trend-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.trend-title b { font-family: var(--f-display); font-weight: 600; font-size: 18px; }
+.delta { font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.delta strong { color: var(--ink); font-weight: 600; }
+#trend-chart { width: 100%; height: auto; display: block; }
+#trend-chart .grid line { stroke: var(--line); stroke-width: 1; }
+#trend-chart .axis text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+#trend-chart .bar { fill: var(--roast-hi); }
+#trend-chart .bar.fc { fill: url(#hatch); stroke: var(--roast-hi); stroke-width: 1.5; }
+#trend-chart .val { fill: var(--ink); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+#trend-chart .fc-lbl { fill: var(--muted); font-size: 10.5px; }
+#trend-chart .hit { fill: transparent; cursor: default; }
+#trend-chart .bar.hover { opacity: .8; }
+.trend-note { font-size: 12.5px; color: var(--muted); margin: 0; }
+.multiples { display: grid; grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)); gap: 8px; }
+.sm {
+  font: inherit; color: inherit; text-align: left; background: transparent; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 9px 6px; display: grid; gap: 2px; min-width: 0;
+}
+.sm:hover { border-color: var(--muted); }
+.sm.sel { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.sm.dim { opacity: .3; }
+.sm .n { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sm .v { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.sm svg { width: 100%; height: 34px; display: block; margin-top: 2px; }
+.sm .area { fill: var(--roast-lo); }
+.sm .line { fill: none; stroke: var(--roast-hi); stroke-width: 1.75; stroke-linejoin: round; }
+.sm .end { fill: var(--roast-hi); stroke: var(--surface); stroke-width: 1.5; }
+.seg.small button { font-size: 12.5px; padding: 4px 10px; }
+
+/* Calendar */
+.two-col { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.scroll-x { overflow-x: auto; }
+table.cal { border-collapse: separate; border-spacing: 3px; width: 100%; min-width: 540px; font-size: 13px; }
+.cal th { font-weight: 500; color: var(--muted); font-size: 11.5px; text-align: center; padding: 0 0 4px; }
+.cal th.cur { color: var(--accent); font-weight: 700; }
+.cal th.cur::after { content: ""; display: block; height: 2px; background: var(--accent); border-radius: 1px; margin: 3px 4px 0; }
+.cal td.c { height: 24px; border-radius: 4px; padding: 0; }
+.cal td.c.cur { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.cal td.name, .bars .name { text-align: left; white-space: nowrap; padding-right: 8px; color: var(--ink); font-weight: 500; }
+.cal tr { cursor: pointer; }
+.cal tr.dim td { opacity: .25; }
+.cal tr.sel td.name, .bars .row.sel .name { color: var(--accent); }
+.cal-key { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; font-size: 12.5px; color: var(--ink-2); }
+.cal-key span { display: inline-flex; align-items: center; gap: 6px; }
+.cal-key i { width: 18px; height: 12px; border-radius: 3px; display: inline-block; }
+
+/* Process bars */
+.bars { display: grid; gap: 6px; }
+.bars .row { display: grid; grid-template-columns: 104px minmax(0, 1fr); align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
+.bars .row.dim { opacity: .25; }
+.bars .mix { height: 24px; }
+.bars .mix i { font-size: 11.5px; }
+
+/* Process cards */
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.card { display: grid; gap: 10px; align-content: start; }
+.card h3 { margin: 0; font-family: var(--f-display); font-weight: 500; font-size: 16px; line-height: 1.3; display: flex; align-items: center; gap: 10px; }
+.card h3 .dot { width: 14px; height: 14px; }
+.card p { margin: 0; color: var(--ink-2); max-width: 64ch; }
+.card .where { font-size: 13px; color: var(--ink-2); }
+.card .where b { color: var(--ink); font-weight: 600; }
+.card button {
+  justify-self: start; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink);
+  background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 5px 12px; cursor: pointer;
+}
+.card button:hover { border-color: var(--ink); }
+.card.on { border-color: var(--ink); }
+
+/* Data table */
+details.data summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+table.data { border-collapse: collapse; width: 100%; min-width: 1240px; font-size: 13px; margin-top: 12px; font-variant-numeric: tabular-nums; }
+.data th, .data td { text-align: left; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.data th { color: var(--muted); font-weight: 500; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; }
+.data td.num, .data th.num { text-align: right; }
+.foot { font-size: 12.5px; color: var(--muted); max-width: 90ch; margin: 0; }
+
+@media (max-width: 980px) {
+  .map-grid, .two-col, .trend-grid { grid-template-columns: minmax(0, 1fr); }
+  .passport { position: static; }
+}
+@media (max-width: 640px) {
+  .cards { grid-template-columns: minmax(0, 1fr); }
+  .pp-code { font-size: 36px; }
+  .bars .row { grid-template-columns: 84px minmax(0, 1fr); }
+  #map .marker text { font-size: 22px; }
+  #map .geo-label { font-size: 17px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">23.5° с.ш. — 23.5° ю.ш. · сезон 2026/27 · мешок 60 кг</div>
+    <h1>Кофейный пояс Земли</h1>
+    <p class="lede">Карта выращивания и производства кофе: где растёт кофе, сколько его собирают, какие сорта и методы обработки зерна, когда идёт сбор урожая. <b>Наведите курсор на страну или точку региона</b>, чтобы открыть паспорт терруара.</p>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <div class="controls">
+    <div class="ctrl">
+      <div class="ctrl-label" id="lbl-filter">Фильтр по обработке</div>
+      <div class="chips" id="filters" role="group" aria-labelledby="lbl-filter"></div>
+    </div>
+    <div class="ctrl">
+      <div class="ctrl-label" id="lbl-layer">Слой раскраски карты</div>
+      <div class="seg" id="layers" role="group" aria-labelledby="lbl-layer"></div>
+    </div>
+  </div>
+
+  <div class="map-grid">
+    <section class="panel" aria-labelledby="h-map">
+      <div class="panel-head">
+        <div>
+          <h2 id="h-map">География производства и методы обработки</h2>
+          <p class="sub">12 крупнейших стран в цвете слоя · Размер маркера = объём урожая · Цвет маркера = основной метод обработки</p>
+        </div>
+      </div>
+      <div class="map-box">
+        <svg id="map" role="img" aria-label="Карта стран-производителей кофе в тропическом поясе"></svg>
+      </div>
+      <div class="legends">
+        <div class="legend-row" id="proc-legend"></div>
+        <div class="ramp" id="ramp"></div>
+        <div class="size-key" id="size-key"></div>
+        <div class="grow-key"><i></i>Другие страны, где выращивают кофе</div>
+      </div>
+    </section>
+
+    <aside class="panel passport" id="passport" aria-live="polite"></aside>
+  </div>
+
+  <section class="panel" aria-labelledby="h-trend">
+    <div class="panel-head">
+      <div>
+        <h2 id="h-trend">Динамика производства по сезонам</h2>
+        <p class="sub">Урожай в млн мешков по 60 кг, сезоны 2021/22–2026/27 · 2026/27 — прогноз USDA (штриховка)</p>
+      </div>
+      <div class="seg small" id="trend-mode" role="group" aria-label="Что показать">
+        <button id="tm-country" data-m="country" aria-pressed="true">Выбранная страна</button>
+        <button id="tm-total" data-m="total" aria-pressed="false">Сумма 12 стран</button>
+      </div>
+    </div>
+    <div class="trend-grid">
+      <div class="trend-main">
+        <div class="trend-title" id="trend-title"></div>
+        <svg id="trend-chart" viewBox="0 0 560 250" role="img" aria-label="Урожай по сезонам"></svg>
+        <p class="trend-note" id="trend-note"></p>
+      </div>
+      <div class="multiples" id="multiples"></div>
+    </div>
+  </section>
+
+  <div class="two-col">
+    <section class="panel" aria-labelledby="h-cal">
+      <div class="panel-head">
+        <div>
+          <h2 id="h-cal">Календарь сбора урожая по месяцам</h2>
+          <p class="sub">Интенсивность цвета: от межсезонья и малого сбора (Fly crop / Mitaca) до пика урожая</p>
+        </div>
+      </div>
+      <div class="scroll-x"><table class="cal" id="cal"></table></div>
+      <div class="cal-key" id="cal-key"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-mix">
+      <div class="panel-head">
+        <div>
+          <h2 id="h-mix">Структура методов обработки по странам</h2>
+          <p class="sub">Соотношение мытой, натуральной, хани и специальной обработки, %</p>
+        </div>
+      </div>
+      <div class="legend-row" id="mix-legend" style="font-size:12.5px;color:var(--ink-2);margin-bottom:12px"></div>
+      <div class="bars" id="bars"></div>
+    </section>
+  </div>
+
+  <div class="cards" id="cards"></div>
+
+  <section class="panel">
+    <details class="data" id="data-details">
+      <summary>Таблица данных по всем регионам</summary>
+      <div class="scroll-x"><table class="data" id="data-table"></table></div>
+    </details>
+  </section>
+
+  <p class="foot">Объёмы — прогноз USDA на сезон 2026/27 (отчёт «Coffee: World Markets and Trade», июль 2026, и страновые обзоры FAS, май–июнь 2026), в млн мешков по 60 кг. Мировое производство по этому прогнозу — рекордные 189,7 млн мешков; ICO в сентябре 2026 оценивает сезон 2025/26 в 183,6 млн. Доли арабики и робусты рассчитаны по тем же обзорам USDA. Доли методов обработки, высоты, сорта и сроки сбора — приблизительные отраслевые оценки, не официальная статистика; сроки сдвигаются по регионам и годам. Цвет страны показывает всю страну, хотя кофе растёт только в части её регионов. Более свежие фактические данные приведены в паспортах: CONAB по Бразилии (сентябрь 2026) и FNC по Колумбии (октябрь 2026). Динамика по сезонам 2021/22–2026/27 — таблицы того же июльского отчёта USDA (по Гватемале — только арабика). Данные сверены 18 октября 2026.</p>
+</div>
+
+<div id="tip" hidden></div>
+
+<script id="world-data" type="application/json">__WORLD__</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<script>
+(() => {
+const WORLD_TOTAL = 189.7; // USDA, 2026/27
+const MONTHS = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+const MONTHS_FULL = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+const LEVELS = ['Межсезонье','Малый сбор (Fly crop / Mitaca)','Сбор урожая','Пик урожая'];
+const NOW = new Date().getMonth();
+const MATCH_MIN = 8; // регион попадает в фильтр, если метод даёт ≥ 8% урожая
+
+const PROC = {
+  washed:  { short: 'Мытая',             chip: 'Мытый (Washed)',          card: 'Мытая обработка (Washed / Wet)', c: '--p-washed' },
+  natural: { short: 'Натуральная',       chip: 'Натуральный (Natural)',   card: 'Натуральная сухая (Natural / Dry)', c: '--p-natural' },
+  honey:   { short: 'Хани',              chip: 'Хани / Pulped Natural',   card: 'Хани / Pulped Natural (Honey)', c: '--p-honey' },
+  special: { short: 'Вет-халл / Муссон', chip: 'Вет-халл и Муссонный',    card: 'Вет-халл (Giling Basah) и Муссонный', c: '--p-special' }
+};
+const FILTER_ORDER = ['washed', 'natural', 'honey', 'special'];
+const STACK_ORDER = ['washed', 'natural', 'special', 'honey'];
+
+const CARD_TEXT = {
+  washed: 'Мякоть ягоды удаляется в депульпаторе, зерно ферментируется в воде и сушится. Даёт максимальную чистоту чашки, яркую кислотность и цветочные или цитрусовые ноты (Колумбия, Кения, Гватемала).',
+  natural: 'Кофейная ягода сушится целиком на солнце, на патио или африканских кроватях. Зерно впитывает сахара мякоти: плотное тело, сладость, ноты спелых ягод, тропических фруктов и шоколада (Бразилия, Эфиопия, Вьетнам).',
+  honey: 'Кожица снимается, но часть клейковины (муциляжа) остаётся на зерне при сушке. Сочетает сладость натуральной обработки и чистую фруктовую кислинку мытой (Коста-Рика, Бразилия).',
+  special: 'Индонезийский вет-халл: пергаментную оболочку снимают при высокой влажности зерна (30–35%), отсюда землистый, пряный вкус и густое тело. Индийский муссонный: зерно выдерживают под влажными ветрами Малабара.'
+};
+
+const LAYERS = {
+  vol: { label: 'Объём (млн мешков)', get: r => r.vol, domain: [0, 72], sqrt: true, fmt: v => fmtVol(v) + ' млн мешков', ticks: ['0', '72 млн'] },
+  ara: { label: 'Доля Арабики (%)', get: r => r.ara, domain: [0, 100], fmt: v => v + '% арабики', ticks: ['0%', '100%'] },
+  rob: { label: 'Доля Робусты (%)', get: r => r.rob, domain: [0, 100], fmt: v => v + '% робусты', ticks: ['0%', '100%'] },
+  alt: { label: 'Средняя высота (м)', get: r => r.altAvg, domain: [500, 2000], fmt: v => '≈ ' + v.toLocaleString('ru-RU') + ' м', ticks: ['500 м', '2 000 м'] }
+};
+
+const R = [
+  { id: '076', iso: 'BRA', name: 'Бразилия', region: 'Минас-Жерайс: Сул-ди-Минас, Серраду', lon: -45.4, lat: -20.2,
+    vol: 71.9, ara: 66, rob: 34, alt: [800, 1300], altAvg: 1000,
+    mix: { washed: 5, natural: 75, honey: 20, special: 0 },
+    varieties: ['Bourbon', 'Mundo Novo', 'Catuaí', 'Yellow Bourbon', 'Conilon (робуста)'],
+    notes: 'Орех, молочный шоколад, карамель; низкая кислотность, плотное тело.',
+    terroir: 'Холмистые плато с красными латосолями, механизированный сбор на Серраду.',
+    check: 'CONAB, сентябрь 2026: 67,6 млн мешков (арабика 48,2, конилон 19,4) — сбор завершён на 99%. Прогноз USDA выше, 71,9 млн.',
+    hist: [58.1, 62.6, 66.3, 65.5, 63.0, 71.9],
+    cal: [0,0,0,1,2,3,3,3,2,0,0,0] },
+  { id: '704', iso: 'VNM', name: 'Вьетнам', region: 'Центральное нагорье: Даклак, Буонметхуот', lon: 108.0, lat: 12.7,
+    vol: 32.5, ara: 3, rob: 97, alt: [500, 1500], altAvg: 650,
+    mix: { washed: 6, natural: 92, honey: 2, special: 0 },
+    varieties: ['Robusta TR4', 'Robusta TR9', 'Catimor (арабика)'],
+    notes: 'Горький шоколад, злаки, землистость; много кофеина, плотная горчинка.',
+    terroir: 'Базальтовые красноземы плато Тэйнгуен, муссонный климат с сухим сезоном.',
+    check: 'Местные трейдеры (Helena Coffee) ждут меньше — 30,5–31,5 млн. Сбор только начинается; главный риск — Эль-Ниньо в Центральном нагорье.',
+    hist: [31.58, 28.3, 27.55, 29.0, 31.7, 32.5],
+    cal: [2,1,0,0,0,0,0,0,0,1,3,3] },
+  { id: '170', iso: 'COL', name: 'Колумбия', region: 'Уила, Нариньо, Кофейная ось', lon: -75.7, lat: 2.4,
+    vol: 13.4, ara: 100, rob: 0, alt: [1200, 2000], altAvg: 1600,
+    mix: { washed: 95, natural: 2, honey: 3, special: 0 },
+    varieties: ['Castillo', 'Caturra', 'Colombia', 'Typica', 'Pink Bourbon'],
+    notes: 'Карамель, красное яблоко, цитрус; сбалансированная кислотность.',
+    terroir: 'Вулканические почвы трёх кордильер Анд, два сезона дождей в год.',
+    check: 'FNC, октябрь 2026: за кофейный год 2025/26 собрано 12,65 млн мешков (−15% к прошлому году). Прогноз USDA на 2026/27 — восстановление до 13,4 млн.',
+    hist: [11.8, 10.7, 12.76, 14.8, 12.5, 13.4],
+    cal: [1,0,0,1,1,1,0,0,2,3,3,2] },
+  { id: '360', iso: 'IDN', name: 'Индонезия', region: 'Южная Суматра, Лампунг, Ява (робуста); Гайо, Линтонг (арабика)', lon: 103.6, lat: -3.6,
+    vol: 11.4, ara: 12, rob: 88, alt: [400, 1600], altAvg: 1000,
+    mix: { washed: 8, natural: 75, honey: 2, special: 15 },
+    varieties: ['Robusta BP', 'Ateng', 'Tim Tim', 'Sigarar Utang', 'Typica'],
+    notes: 'Робуста: какао, злаки, горчинка. Арабика вет-халл с Суматры: землистость, специи, табак, кедр, густое тело.',
+    terroir: 'Низины Южной Суматры и Явы дают робусту; в нагорьях у озера Тавар влажность мешает сушке, отсюда вет-халл.',
+    check: 'USDA, май 2026: робуста 10,0 млн, арабика 1,38 млн. Спад на 8% из-за ливней в зоне робусты.',
+    hist: [10.58, 10.7, 8.15, 10.7, 12.37, 11.38],
+    cal: [1,0,0,2,3,3,2,1,1,2,2,1] },
+  { id: '231', iso: 'ETH', name: 'Эфиопия', region: 'Сидамо, Иргачефф, Гуджи', lon: 38.3, lat: 6.3,
+    vol: 12.1, ara: 100, rob: 0, alt: [1500, 2200], altAvg: 1900,
+    mix: { washed: 33, natural: 65, honey: 2, special: 0 },
+    varieties: ['Местные популяции (Heirloom)', '74110', '74112', 'Kurume'],
+    notes: 'Бергамот, жасмин, черника, лимон; яркая, чайная кислотность.',
+    terroir: 'Родина арабики: лесной и садовый кофе на вулканических суглинках.',
+    check: 'USDA (обзор атташе, май 2026): рекорд и 4-е место в мире, впервые выше Индонезии.',
+    hist: [8.15, 7.3, 9.13, 11.46, 11.56, 12.1],
+    cal: [2,1,0,0,0,0,0,0,0,2,3,3] },
+  { id: '800', iso: 'UGA', name: 'Уганда', region: 'Бугису (гора Элгон), Центральный регион', lon: 34.0, lat: 0.9,
+    vol: 7.16, ara: 16, rob: 84, alt: [900, 2300], altAvg: 1300,
+    mix: { washed: 18, natural: 80, honey: 2, special: 0 },
+    varieties: ['Robusta Nganda', 'Robusta Erecta', 'SL14', 'SL28'],
+    notes: 'Какао, пряности, тёмный шоколад; арабика Бугису даёт цитрус и винные ноты.',
+    terroir: 'Склоны вулкана Элгон и низины бассейна озера Виктория, родина дикой робусты.',
+    check: 'USDA, июнь 2026: робуста 6,03 млн, арабика 1,14 млн.',
+    hist: [6.05, 6.565, 6.4, 6.7, 7.095, 7.16],
+    cal: [2,1,0,0,1,2,2,1,1,2,3,3] },
+  { id: '340', iso: 'HND', name: 'Гондурас', region: 'Копан, Маркала, Санта-Барбара', lon: -88.0, lat: 14.6,
+    vol: 6.03, ara: 100, rob: 0, alt: [1000, 1700], altAvg: 1350,
+    mix: { washed: 88, natural: 5, honey: 7, special: 0 },
+    varieties: ['Lempira', 'IHCAFE 90', 'Catuaí', 'Pacas', 'Parainema'],
+    notes: 'Карамель, персик, мягкий цитрус; округлая кислотность.',
+    terroir: 'Горные леса центрального нагорья, тысячи мелких семейных ферм.',
+    check: 'USDA, июль 2026: восстановление на 0,5 млн мешков, впервые с 2021/22 больше 6 млн.',
+    hist: [4.8, 5.7, 5.05, 5.2, 5.53, 6.03],
+    cal: [3,3,2,1,0,0,0,0,0,1,2,3] },
+  { id: '356', iso: 'IND', name: 'Индия', region: 'Карнатака: Чикмагалур, Кург; Малабар', lon: 75.8, lat: 13.3,
+    vol: 6.14, ara: 25, rob: 75, alt: [800, 1500], altAvg: 1050,
+    mix: { washed: 35, natural: 55, honey: 2, special: 8 },
+    varieties: ['S795', 'Kent', 'Chandragiri', 'Robusta CxR'],
+    notes: 'Пряности, тёмный шоколад, низкая кислотность; Monsooned Malabar — тело и землистость.',
+    terroir: 'Теневой кофе под пологом леса Западных Гат, рядом с перцем и кардамоном.',
+    check: 'USDA, май 2026: арабика 1,56 млн, робуста 4,58 млн. Спад на 4,5% из-за жары и засухи.',
+    hist: [5.7, 5.867, 6.56, 6.059, 6.43, 6.14],
+    cal: [3,3,2,0,0,0,0,0,0,0,1,2] },
+  { id: '604', iso: 'PER', name: 'Перу', region: 'Кахамарка, Хаэн, Чанчамайо', lon: -78.8, lat: -5.7,
+    vol: 4.78, ara: 100, rob: 0, alt: [1200, 2000], altAvg: 1600,
+    mix: { washed: 90, natural: 5, honey: 5, special: 0 },
+    varieties: ['Typica', 'Caturra', 'Bourbon', 'Catimor', 'Geisha'],
+    notes: 'Орех, какао, мягкая цитрусовая кислотность, сладкое послевкусие.',
+    terroir: 'Восточные склоны Анд и высокогорная сельва, много органических хозяйств.',
+    check: 'USDA, июнь 2026: +0,3%; ржавчина листьев затрагивает почти 40% посадок.',
+    hist: [4.2, 3.475, 3.912, 4.12, 4.764, 4.78],
+    cal: [0,0,0,1,2,3,3,2,1,0,0,0] },
+  { id: '320', iso: 'GTM', name: 'Гватемала', region: 'Уэуэтенанго, Антигуа, Атитлан', lon: -91.4, lat: 15.4,
+    vol: 3.26, ara: 98, rob: 2, alt: [1300, 2000], altAvg: 1600,
+    mix: { washed: 92, natural: 4, honey: 4, special: 0 },
+    varieties: ['Bourbon', 'Caturra', 'Catuaí', 'Pache', 'Typica'],
+    notes: 'Шоколад, специи, пралине; яркая яблочная кислотность.',
+    terroir: 'Вулканические и известняковые почвы, тёплые сухие ветра со стороны Мексики.',
+    check: 'Оценки расходятся: годовой обзор USDA — 3,26 млн, сводка StoneX по тем же данным — 3,13 млн.',
+    hist: [3.41, 3.15, 3.339, 3.14, 3.025, 3.13],
+    histNote: 'Ряд USDA только по арабике; робуста (≈0,13 млн мешков в год) не входит.',
+    cal: [3,3,3,2,0,0,0,0,0,0,1,2] },
+  { id: '188', iso: 'CRI', name: 'Коста-Рика', region: 'Тарразу, Западная долина', lon: -84.0, lat: 9.6,
+    vol: 1.2, ara: 100, rob: 0, alt: [1200, 1900], altAvg: 1500,
+    mix: { washed: 60, natural: 10, honey: 30, special: 0 },
+    varieties: ['Caturra', 'Catuaí', 'Villa Sarchí', 'Geisha'],
+    notes: 'Мёд, абрикос, цитрус; чистая и яркая кислотность.',
+    terroir: 'Вулканические почвы Центральной долины, сотни микромельниц.',
+    check: 'USDA, май 2026: +3,5% в «высокий» год двухлетнего цикла; рост сдерживают дорогой колон и затраты.',
+    hist: [1.215, 1.1, 1.158, 1.315, 1.16, 1.2],
+    cal: [3,3,2,0,0,0,0,0,0,1,2,3] },
+  { id: '404', iso: 'KEN', name: 'Кения', region: 'Ньери, Кириньяга, Мурангʼа', lon: 37.0, lat: -0.4,
+    vol: 0.95, ara: 100, rob: 0, alt: [1400, 2100], altAvg: 1700,
+    mix: { washed: 95, natural: 5, honey: 0, special: 0 },
+    varieties: ['SL28', 'SL34', 'Ruiru 11', 'Batian'],
+    notes: 'Чёрная смородина, грейпфрут, томат; сочная винная кислотность.',
+    terroir: 'Фосфорные вулканические почвы склонов горы Кения, двойная ферментация.',
+    check: 'USDA, май 2026: +12% за счёт новых посадок, вступивших в плодоношение.',
+    hist: [0.86, 0.75, 0.825, 0.95, 0.85, 0.95],
+    cal: [1,0,0,1,1,1,0,0,1,3,3,2] }
+];
+R.forEach(r => { r.main = STACK_ORDER.reduce((a, k) => r.mix[k] > r.mix[a] ? k : a, 'washed'); });
+const byIso = Object.fromEntries(R.map(r => [r.iso, r]));
+const byId = Object.fromEntries(R.map(r => [r.id, r]));
+const SORTED = [...R].sort((a, b) => b.vol - a.vol);
+// Другие страны, где выращивают кофе (не входят в выборку 12 крупнейших)
+const GROWERS = {
+  '484': 'Мексика', '558': 'Никарагуа', '222': 'Сальвадор', '591': 'Панама', '218': 'Эквадор', '068': 'Боливия',
+  '862': 'Венесуэла', '214': 'Доминиканская Республика', '192': 'Куба', '332': 'Гаити', '388': 'Ямайка', '630': 'Пуэрто-Рико',
+  '834': 'Танзания', '646': 'Руанда', '108': 'Бурунди', '180': 'ДР Конго', '384': 'Кот-д’Ивуар', '120': 'Камерун',
+  '450': 'Мадагаскар', '454': 'Малави', '894': 'Замбия', '716': 'Зимбабве', '324': 'Гвинея', '768': 'Того',
+  '140': 'ЦАР', '694': 'Сьерра-Леоне', '024': 'Ангола', '430': 'Либерия', '288': 'Гана', '887': 'Йемен',
+  '418': 'Лаос', '764': 'Таиланд', '104': 'Мьянма', '608': 'Филиппины', '598': 'Папуа — Новая Гвинея',
+  '156': 'Китай (Юньнань)', '144': 'Шри-Ланка', '626': 'Восточный Тимор', '524': 'Непал'
+};
+
+const state = { filter: 'all', layer: 'vol', sel: 'BRA' };
+const matches = r => state.filter === 'all' || r.mix[state.filter] >= MATCH_MIN;
+const fmtVol = v => v.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ---------- Controls ---------- */
+const filtersEl = document.getElementById('filters');
+function renderFilters() {
+  const opts = [['all', `Все регионы`, R.length]].concat(FILTER_ORDER.map(k => [k, PROC[k].chip, R.filter(r => r.mix[k] >= MATCH_MIN).length]));
+  filtersEl.innerHTML = opts.map(([k, label, n]) =>
+    `<button class="chip" id="f-${k}" data-f="${k}" aria-pressed="${state.filter === k}">` +
+    (k === 'all' ? '' : `<span class="dot" style="background:var(${PROC[k].c})"></span>`) +
+    `${esc(label)} <span class="n">${n}</span></button>`).join('');
+}
+filtersEl.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  setFilter(b.dataset.f);
+});
+const layersEl = document.getElementById('layers');
+layersEl.innerHTML = Object.entries(LAYERS).map(([k, l]) => `<button id="l-${k}" data-l="${k}" aria-pressed="${state.layer === k}">${l.label}</button>`).join('');
+layersEl.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  state.layer = b.dataset.l;
+  layersEl.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.l === state.layer));
+  paintMap(); renderRamp();
+});
+function setFilter(f) {
+  state.filter = f;
+  renderFilters();
+  if (!matches(byIso[state.sel])) { const first = SORTED.find(matches); if (first) state.sel = first.iso; }
+  update();
+}
+
+/* ---------- Stats ---------- */
+function renderStats() {
+  const list = R.filter(matches);
+  const total = list.reduce((s, r) => s + r.vol, 0);
+  const now = SORTED.filter(r => matches(r) && r.cal[NOW] >= 2).map(r => r.name + (r.cal[NOW] === 3 ? ' (пик)' : ''));
+  document.getElementById('stats').innerHTML =
+    `<div class="stat"><span class="k">Регионов</span><span class="v">${list.length}</span></div>` +
+    `<div class="stat"><span class="k">Урожай 2026/27, прогноз</span><span class="v">${total.toLocaleString('ru-RU', { maximumFractionDigits: 1 })}<small>млн мешков</small></span></div>` +
+    `<div class="stat"><span class="k">Доля мира</span><span class="v">≈${Math.round(total / WORLD_TOTAL * 100)}<small>%</small></span></div>` +
+    `<div class="stat now"><span class="k">Сейчас собирают · ${MONTHS_FULL[NOW]}</span><span class="v">${now.length ? esc(now.join(', ')) : 'В выбранных регионах межсезонье'}</span></div>`;
+}
+
+/* ---------- Map ---------- */
+const svg = d3.select('#map');
+svg.selectAll('*').remove();
+const world = JSON.parse(document.getElementById('world-data').textContent);
+const land = topojson.feature(world, world.objects.countries).features.filter(f => f.id !== '010');
+const W = 1000;
+const frame = { type: 'MultiPoint', coordinates: [[-118, 34], [156, 34], [-118, -35], [156, -35], [-118, 0], [156, 0]] };
+const proj = d3.geoEqualEarth().fitWidth(W, frame);
+const gp = d3.geoPath(proj);
+const fb = gp.bounds(frame);
+const PAD = 6;
+proj.translate([proj.translate()[0], proj.translate()[1] - fb[0][1] + PAD]);
+const H = Math.round(fb[1][1] - fb[0][1] + PAD * 2);
+svg.attr('viewBox', `0 0 ${W} ${H}`);
+
+const yN = proj([0, 23.5])[1], yS = proj([0, -23.5])[1], yE = proj([0, 0])[1];
+svg.append('rect').attr('class', 'belt').attr('x', 0).attr('y', yN).attr('width', W).attr('height', yS - yN);
+const gLand = svg.append('g');
+gLand.selectAll('path').data(land).join('path')
+  .attr('d', gp)
+  .attr('class', d => byId[d.id] ? 'prod' : GROWERS[d.id] ? 'grow' : 'land')
+  .attr('data-iso', d => byId[d.id] ? byId[d.id].iso : null);
+svg.append('line').attr('class', 'tropic').attr('x1', 0).attr('x2', W).attr('y1', yN).attr('y2', yN);
+svg.append('line').attr('class', 'tropic').attr('x1', 0).attr('x2', W).attr('y1', yS).attr('y2', yS);
+svg.append('line').attr('class', 'equator').attr('x1', 0).attr('x2', W).attr('y1', yE).attr('y2', yE);
+const lx = proj([-116, 0])[0];
+svg.append('text').attr('class', 'geo-label').attr('x', lx).attr('y', yN - 6).text('Тропик Рака · 23.5° с.ш.');
+svg.append('text').attr('class', 'geo-label').attr('x', lx).attr('y', yS + 15).text('Тропик Козерога · 23.5° ю.ш.');
+svg.append('text').attr('class', 'geo-label').attr('x', lx).attr('y', yE - 5).text('Экватор');
+
+const rScale = d3.scaleSqrt().domain([0, 72]).range([0, 26]);
+const rOf = r => Math.max(5.5, rScale(r.vol));
+const gMarkers = svg.append('g');
+const LABELED = new Set(['BRA', 'VNM', 'COL', 'IDN', 'ETH']);
+const mk = gMarkers.selectAll('g').data(SORTED).join('g')
+  .attr('class', 'marker')
+  .attr('tabindex', 0)
+  .attr('role', 'button')
+  .attr('data-iso', d => d.iso)
+  .attr('aria-label', d => `${d.name}: ${fmtVol(d.vol)} млн мешков, открыть паспорт`)
+  .attr('transform', d => `translate(${proj([d.lon, d.lat]).join(',')})`);
+mk.append('circle').attr('class', 'hit').attr('r', d => rOf(d) + 7);
+mk.append('circle').attr('class', 'm').attr('r', rOf);
+mk.filter(d => LABELED.has(d.iso)).append('text')
+  .attr('x', d => rOf(d) + 5).attr('y', 5).text(d => d.iso);
+
+function layerColor() {
+  const L = LAYERS[state.layer];
+  const s = (L.sqrt ? d3.scaleSqrt() : d3.scaleLinear()).domain(L.domain).range([0, 1]).clamp(true);
+  return r => `color-mix(in oklab, var(--roast-hi) ${(s(L.get(r)) * 100).toFixed(1)}%, var(--roast-lo))`;
+}
+function paintMap() {
+  const col = layerColor();
+  gLand.selectAll('path.prod')
+    .style('fill', d => matches(byId[d.id]) ? col(byId[d.id]) : null)
+    .classed('sel', d => byId[d.id].iso === state.sel);
+  mk.classed('dim', d => !matches(d)).classed('sel', d => d.iso === state.sel);
+  mk.select('circle.m').style('fill', d => `var(${PROC[d.main].c})`);
+  // selected marker on top
+  mk.filter(d => d.iso === state.sel).raise();
+}
+function renderRamp() {
+  const L = LAYERS[state.layer];
+  document.getElementById('ramp').innerHTML =
+    `<div class="ramp-bar" style="background:linear-gradient(90deg, var(--roast-lo), var(--roast-hi))"></div>` +
+    `<div class="ramp-ticks"><span>${L.ticks[0]}</span><span>${esc(L.label.replace(/ \(.*\)/, ''))}</span><span>${L.ticks[1]}</span></div>`;
+}
+document.getElementById('proc-legend').innerHTML =
+  STACK_ORDER.filter(k => R.some(r => r.main === k)).map(k => `<span><i class="dot" style="background:var(${PROC[k].c})"></i>${PROC[k].short}</span>`).join('');
+document.getElementById('size-key').innerHTML =
+  [1, 10, 70].map(v => { const d = Math.max(5.5, rScale(v)) * 2 * 0.62; return `<i style="width:${d}px;height:${d}px"></i>`; }).join('') +
+  '<span>1 · 10 · 70 млн мешков</span>';
+
+/* ---------- Tooltip ---------- */
+const tip = document.getElementById('tip');
+function showTip(html, x, y) {
+  tip.innerHTML = html; tip.hidden = false;
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let left = x + 14, top = y + 14;
+  if (left + w > innerWidth - 8) left = x - w - 14;
+  if (top + h > innerHeight - 8) top = y - h - 14;
+  tip.style.left = Math.max(8, left) + 'px'; tip.style.top = Math.max(8, top) + 'px';
+}
+const hideTip = () => { tip.hidden = true; };
+function regionTip(r) {
+  const L = LAYERS[state.layer];
+  return `<b>${esc(r.name)}</b> · ${esc(r.region)}<div class="t-row">${esc(L.label.replace(/ \(.*\)/, ''))}: ${esc(L.fmt(L.get(r)))}</div>` +
+    `<div class="t-row"><i class="dot" style="background:var(${PROC[r.main].c})"></i>Основная обработка: ${PROC[r.main].short.toLowerCase()}</div>`;
+}
+function bindHover(sel, getR) {
+  sel.on('pointerenter', (e, d) => { const r = getR(d); select(r.iso); })
+     .on('pointermove', (e, d) => showTip(regionTip(getR(d)), e.clientX, e.clientY))
+     .on('pointerleave', hideTip)
+     .on('click', (e, d) => select(getR(d).iso))
+     .on('focus', (e, d) => select(getR(d).iso))
+     .on('keydown', (e, d) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(getR(d).iso); } });
+}
+bindHover(mk, d => d);
+bindHover(gLand.selectAll('path.prod'), d => byId[d.id]);
+gLand.selectAll('path.grow')
+  .on('pointermove', (e, d) => showTip(`<b>${esc(GROWERS[d.id])}</b><div class="t-row">Тоже выращивает кофе, но не входит в 12 крупнейших стран выборки</div>`, e.clientX, e.clientY))
+  .on('pointerleave', hideTip);
+
+/* ---------- Passport ---------- */
+function mixBar(r, withLabels) {
+  return `<div class="mix">` + STACK_ORDER.filter(k => r.mix[k] > 0).map(k =>
+    `<i style="flex:${r.mix[k]};background:var(${PROC[k].c})" title="${PROC[k].short}: ${r.mix[k]}%">${withLabels && r.mix[k] >= 9 ? r.mix[k] + '%' : ''}</i>`).join('') + `</div>`;
+}
+function renderPassport() {
+  const r = byIso[state.sel];
+  const share = (r.vol / WORLD_TOTAL * 100);
+  const special = r.iso === 'IDN' ? 'вет-халл (Giling Basah)' : r.iso === 'IND' ? 'муссонный (Monsooned Malabar)' : null;
+  document.getElementById('passport').innerHTML = `
+    <div class="pp-mark"><span class="pp-code">${r.iso}</span><span class="pp-bag">Паспорт терруара<br>мешок 60 кг</span></div>
+    <div><h2 class="pp-name">${esc(r.name)}</h2><p class="pp-region">${esc(r.region)}</p></div>
+    <div class="pp-grid">
+      <div class="kv"><span class="k">Урожай 2026/27</span><span class="v">${fmtVol(r.vol)} <small>млн мешков</small></span></div>
+      <div class="kv"><span class="k">К 2021/22</span><span class="v">${fmtPct(pct(r.hist[0], r.hist[5]))}</span></div>
+      <div class="kv"><span class="k">Доля мира</span><span class="v">${share < 1 ? share.toFixed(1).replace('.', ',') : Math.round(share)}%</span></div>
+      <div class="kv"><span class="k">Высота</span><span class="v">${r.alt[0].toLocaleString('ru-RU')}–${r.alt[1].toLocaleString('ru-RU')} <small>м</small></span></div>
+      <div class="kv"><span class="k">Средняя высота</span><span class="v">≈ ${r.altAvg.toLocaleString('ru-RU')} <small>м</small></span></div>
+      <div class="kv" style="grid-column:1/-1"><span class="k">Арабика / Робуста</span>
+        <span class="v">${r.ara}% <small>арабика</small> · ${r.rob}% <small>робуста</small></span>
+        <div class="split"><i style="flex:${r.ara};background:var(--roast-hi)"></i>${r.rob ? `<i style="flex:${r.rob};background:var(--roast-lo)"></i>` : ''}</div>
+      </div>
+    </div>
+    <div class="pp-sec"><span class="k">Обработка · основная: ${PROC[r.main].short.toLowerCase()}${special ? ' · особая: ' + special : ''}</span>${mixBar(r, true)}</div>
+    <div class="pp-sec"><span class="k">Сорта</span><div class="tags">${r.varieties.map(v => `<span class="tag">${esc(v)}</span>`).join('')}</div></div>
+    <div class="pp-sec"><span class="k">Профиль чашки</span><p>${esc(r.notes)}</p></div>
+    <div class="pp-sec"><span class="k">Терруар</span><p>${esc(r.terroir)}</p></div>
+    <div class="pp-sec"><span class="k">Сверка с другими источниками</span><p>${esc(r.check)}</p></div>
+    <div class="pp-sec"><span class="k">Сезон сбора</span>
+      <div class="mini-cal">${r.cal.map((l, i) => `<div style="background:var(--cal-${l})" title="${MONTHS_FULL[i]}: ${LEVELS[l]}"></div>`).join('')}</div>
+      <div class="mini-cal-lbl">${MONTHS.map((m, i) => `<span class="${i === NOW ? 'cur' : ''}">${m[0]}</span>`).join('')}</div>
+    </div>
+    <p class="pp-hint">Наведите на другую страну, маркер или строку календаря, чтобы сменить паспорт.</p>`;
+}
+
+/* ---------- Trend ---------- */
+const SEASONS = ['2021/22', '2022/23', '2023/24', '2024/25', '2025/26', '2026/27'];
+const FC = SEASONS.length - 1;
+let trendMode = 'country';
+const pct = (a, b) => (b / a - 1) * 100;
+const fmtPct = v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toLocaleString('ru-RU', { maximumFractionDigits: 1 }) + '%';
+const sumHist = list => SEASONS.map((_, i) => list.reduce((s, r) => s + r.hist[i], 0));
+const trendSvg = d3.select('#trend-chart');
+const TW = 560, TH = 250, TM = { l: 40, r: 8, t: 26, b: 30 };
+function renderTrend() {
+  const list = R.filter(matches);
+  const r = byIso[state.sel];
+  const total = trendMode === 'total';
+  const series = total ? sumHist(list) : r.hist;
+  const name = total ? (state.filter === 'all' ? '12 стран вместе' : `Страны фильтра «${PROC[state.filter].short}» (${list.length})`) : r.name;
+  const best = series.slice(0, FC).reduce((m, v, i) => v > series[m] ? i : m, 0);
+  document.getElementById('trend-title').innerHTML =
+    `<b>${esc(name)}</b><span class="delta">2026/27 к 2021/22: <strong>${fmtPct(pct(series[0], series[FC]))}</strong> · к 2025/26: <strong>${fmtPct(pct(series[FC - 1], series[FC]))}</strong></span>`;
+  document.getElementById('trend-note').textContent =
+    (total ? 'Сумма рядов USDA по странам выборки. ' : '') +
+    `Лучший фактический сезон за период: ${SEASONS[best]} (${fmtVol(+series[best].toFixed(2))} млн).` +
+    (!total && r.histNote ? ' ' + r.histNote : '');
+
+  const x = d3.scaleBand().domain(SEASONS).range([TM.l, TW - TM.r]).paddingInner(0.28).paddingOuter(0.12);
+  const y = d3.scaleLinear().domain([0, d3.max(series) * 1.08]).nice().range([TH - TM.b, TM.t]);
+  trendSvg.selectAll('*').remove();
+  trendSvg.append('defs').html(`<pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" style="fill:var(--surface)"></rect><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--roast-hi);stroke-width:2.5"></line></pattern>`);
+  const ticks = y.ticks(4);
+  const g = trendSvg.append('g').attr('class', 'grid');
+  ticks.forEach(t => g.append('line').attr('x1', TM.l).attr('x2', TW - TM.r).attr('y1', y(t)).attr('y2', y(t)));
+  const ax = trendSvg.append('g').attr('class', 'axis');
+  ticks.forEach(t => ax.append('text').attr('x', TM.l - 6).attr('y', y(t) + 4).attr('text-anchor', 'end').text(t.toLocaleString('ru-RU')));
+  SEASONS.forEach(sn => ax.append('text').attr('x', x(sn) + x.bandwidth() / 2).attr('y', TH - TM.b + 17).attr('text-anchor', 'middle').text(sn));
+  const bw = x.bandwidth(), rad = Math.min(4, bw / 2);
+  series.forEach((v, i) => {
+    const x0 = x(SEASONS[i]), y0 = y(v), h = (TH - TM.b) - y0;
+    const d = `M${x0},${TH - TM.b}V${y0 + rad}Q${x0},${y0} ${x0 + rad},${y0}H${x0 + bw - rad}Q${x0 + bw},${y0} ${x0 + bw},${y0 + rad}V${TH - TM.b}Z`;
+    const bar = trendSvg.append('path').attr('class', 'bar' + (i === FC ? ' fc' : '')).attr('d', h > 0 ? d : '');
+    trendSvg.append('text').attr('class', 'val').attr('x', x0 + bw / 2).attr('y', y0 - 6).attr('text-anchor', 'middle')
+      .text(v.toLocaleString('ru-RU', { maximumFractionDigits: v < 10 ? 2 : 1 }));
+    trendSvg.append('rect').attr('class', 'hit').attr('x', x0 - 4).attr('y', TM.t).attr('width', bw + 8).attr('height', TH - TM.b - TM.t)
+      .on('pointermove', e => {
+        bar.classed('hover', true);
+        const ch = i > 0 ? `<div class="t-row">К ${SEASONS[i - 1]}: ${fmtPct(pct(series[i - 1], v))}</div>` : '';
+        showTip(`<b>${esc(name)}</b> · ${SEASONS[i]}${i === FC ? ' (прогноз)' : ''}<div class="t-row">${fmtVol(+v.toFixed(3))} млн мешков</div>${ch}`, e.clientX, e.clientY);
+      })
+      .on('pointerleave', () => { bar.classed('hover', false); hideTip(); });
+  });
+  if (series.length) trendSvg.append('text').attr('class', 'fc-lbl').attr('x', x(SEASONS[FC]) + bw / 2).attr('y', TM.t - 12).attr('text-anchor', 'middle').text('прогноз');
+  document.querySelectorAll('#trend-mode button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === trendMode));
+  renderMultiples();
+}
+const multiples = document.getElementById('multiples');
+function renderMultiples() {
+  multiples.innerHTML = SORTED.map(r => {
+    const w = 120, h = 34, max = d3.max(r.hist) * 1.06;
+    const px = i => 3 + i * (w - 6) / (SEASONS.length - 1), py = v => h - 2 - (v / max) * (h - 6);
+    const pts = r.hist.map((v, i) => `${px(i).toFixed(1)},${py(v).toFixed(1)}`);
+    const area = `M${px(0)},${h}L${pts.join('L')}L${px(SEASONS.length - 1)},${h}Z`;
+    const ch = pct(r.hist[0], r.hist[FC]);
+    return `<button type="button" class="sm ${r.iso === state.sel && trendMode === 'country' ? 'sel' : ''} ${matches(r) ? '' : 'dim'}" data-iso="${r.iso}" id="sm-${r.iso}">
+      <span class="n">${esc(r.name)}</span>
+      <span class="v">${fmtVol(r.hist[FC])} млн · ${fmtPct(ch)}</span>
+      <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><path class="area" d="${area}"></path><polyline class="line" points="${pts.join(' ')}" vector-effect="non-scaling-stroke"></polyline><circle class="end" cx="${px(FC)}" cy="${py(r.hist[FC])}" r="2.6"></circle></svg>
+    </button>`;
+  }).join('');
+}
+multiples.addEventListener('pointerover', e => { const b = e.target.closest('.sm'); if (b && trendMode === 'country') select(b.dataset.iso); });
+multiples.addEventListener('click', e => {
+  const b = e.target.closest('.sm'); if (!b) return;
+  trendMode = 'country'; state.sel = null; select(b.dataset.iso);
+});
+document.getElementById('trend-mode').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  trendMode = b.dataset.m; renderTrend();
+});
+
+/* ---------- Calendar ---------- */
+const cal = document.getElementById('cal');
+function renderCal() {
+  cal.innerHTML = `<thead><tr><th></th>${MONTHS.map((m, i) => `<th class="${i === NOW ? 'cur' : ''}" scope="col">${m}</th>`).join('')}</tr></thead><tbody>` +
+    SORTED.map(r => `<tr data-iso="${r.iso}" class="${matches(r) ? '' : 'dim'} ${r.iso === state.sel ? 'sel' : ''}">` +
+      `<td class="name">${esc(r.name)}</td>` +
+      r.cal.map((l, i) => `<td class="c ${i === NOW ? 'cur' : ''}" data-m="${i}" style="background:var(--cal-${l})"></td>`).join('') + `</tr>`).join('') + `</tbody>`;
+}
+cal.addEventListener('pointerover', e => { const tr = e.target.closest('tr[data-iso]'); if (tr) select(tr.dataset.iso); });
+cal.addEventListener('pointermove', e => {
+  const td = e.target.closest('td.c'); if (!td) { hideTip(); return; }
+  const r = byIso[td.parentElement.dataset.iso], m = +td.dataset.m;
+  showTip(`<b>${esc(r.name)}</b> · ${MONTHS_FULL[m]}<div class="t-row"><i class="dot" style="background:var(--cal-${r.cal[m]});box-shadow:0 0 0 1px var(--line)"></i>${LEVELS[r.cal[m]]}</div>`, e.clientX, e.clientY);
+});
+cal.addEventListener('pointerleave', hideTip);
+document.getElementById('cal-key').innerHTML = LEVELS.map((l, i) => `<span><i style="background:var(--cal-${i});box-shadow:inset 0 0 0 1px var(--line)"></i>${l}</span>`).join('') +
+  `<span><i style="box-shadow:inset 0 0 0 1.5px var(--accent)"></i>Текущий месяц</span>`;
+
+/* ---------- Process bars ---------- */
+const bars = document.getElementById('bars');
+document.getElementById('mix-legend').innerHTML = STACK_ORDER.map(k => `<span><i class="dot" style="background:var(${PROC[k].c})"></i>${PROC[k].short}</span>`).join('');
+function renderBars() {
+  bars.innerHTML = SORTED.map(r => `<div class="row ${matches(r) ? '' : 'dim'} ${r.iso === state.sel ? 'sel' : ''}" data-iso="${r.iso}"><span class="name">${esc(r.name)}</span>${mixBar(r, true)}</div>`).join('');
+}
+bars.addEventListener('pointerover', e => { const row = e.target.closest('.row'); if (row) select(row.dataset.iso); });
+bars.addEventListener('pointermove', e => {
+  const i = e.target.closest('.mix i'); if (!i) { hideTip(); return; }
+  const r = byIso[i.closest('.row').dataset.iso];
+  showTip(`<b>${esc(r.name)}</b><div class="t-row">${esc(i.title)}</div>`, e.clientX, e.clientY);
+});
+bars.addEventListener('pointerleave', hideTip);
+
+/* ---------- Process cards ---------- */
+const cards = document.getElementById('cards');
+function renderCards() {
+  cards.innerHTML = FILTER_ORDER.map(k => {
+    const list = SORTED.filter(r => r.mix[k] >= MATCH_MIN).map(r => `${r.name} ${r.mix[k]}%`);
+    const on = state.filter === k;
+    return `<article class="panel card ${on ? 'on' : ''}">
+      <h3><span class="dot" style="background:var(${PROC[k].c})"></span>${PROC[k].card}</h3>
+      <p>${CARD_TEXT[k]}</p>
+      <div class="where"><b>В нашей выборке:</b> ${esc(list.join(', '))}</div>
+      <button type="button" id="card-${k}" data-f="${k}">${on ? 'Показать все регионы' : 'Показать на карте'}</button>
+    </article>`;
+  }).join('');
+}
+cards.addEventListener('click', e => {
+  const b = e.target.closest('button[data-f]'); if (!b) return;
+  setFilter(state.filter === b.dataset.f ? 'all' : b.dataset.f);
+  document.getElementById('h-map').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+});
+
+/* ---------- Data table ---------- */
+document.getElementById('data-table').innerHTML =
+  `<thead><tr><th>Страна</th><th>Регион</th><th class="num">2026/27, млн мешков</th><th class="num">Арабика</th><th class="num">Робуста</th><th class="num">Высота, м</th><th class="num">Мытая</th><th class="num">Натур.</th><th class="num">Хани</th><th class="num">Вет-халл / муссон</th><th class="num">2021/22</th><th class="num">2025/26</th><th>Сбор (пик)</th><th>Сверка</th></tr></thead><tbody>` +
+  SORTED.map(r => {
+    const harvest = r.cal.map((l, i) => l >= 2 ? i : -1).filter(i => i >= 0);
+    const peak = r.cal.map((l, i) => l === 3 ? MONTHS[i] : null).filter(Boolean);
+    return `<tr><td>${esc(r.name)}</td><td>${esc(r.region)}</td><td class="num">${fmtVol(r.vol)}</td><td class="num">${r.ara}%</td><td class="num">${r.rob}%</td>` +
+      `<td class="num">${r.alt[0]}–${r.alt[1]}</td>` + ['washed', 'natural', 'honey', 'special'].map(k => `<td class="num">${r.mix[k]}%</td>`).join('') +
+      `<td class="num">${fmtVol(r.hist[0])}</td><td class="num">${fmtVol(r.hist[4])}</td><td>${harvest.map(i => MONTHS[i]).join(', ')} (${peak.join(', ')})</td><td>${esc(r.check)}</td></tr>`;
+  }).join('') + `</tbody>`;
+
+/* ---------- Wiring ---------- */
+function select(iso) {
+  if (iso === state.sel) return;
+  state.sel = iso;
+  paintMap(); renderPassport(); renderTrend();
+  cal.querySelectorAll('tr[data-iso]').forEach(tr => tr.classList.toggle('sel', tr.dataset.iso === iso));
+  bars.querySelectorAll('.row').forEach(row => row.classList.toggle('sel', row.dataset.iso === iso));
+}
+function update() {
+  renderStats(); paintMap(); renderPassport(); renderTrend(); renderCal(); renderBars(); renderCards();
+}
+renderFilters(); renderRamp(); update();
+
+// перекрасить карту при смене темы
+const repaint = () => paintMap();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', repaint);
+new MutationObserver(repaint).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+})();
+</script>

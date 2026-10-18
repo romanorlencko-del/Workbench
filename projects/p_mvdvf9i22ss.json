@@ -1,0 +1,658 @@
+{
+  "version": 1,
+  "name": "Кофейный пояс Земли",
+  "meta": {
+    "description": "",
+    "workdir": "",
+    "max_parallel": 4,
+    "log_level": "info",
+    "stage": "plan",
+    "input_reserve_tokens": 8000,
+    "models": {
+      "primary": {
+        "label": "Основная",
+        "provider": "openai-compatible",
+        "base_url": "https://api.gonka24.com/v1",
+        "model": "qwen3-235b",
+        "api_key_env": "GONKA_API_KEY",
+        "context_tokens": 160000,
+        "max_output_tokens": 16384
+      },
+      "heavy": {
+        "label": "Тяжёлая",
+        "provider": "openai-compatible",
+        "base_url": "",
+        "model": "glm-5.2",
+        "api_key_env": "GLM_API_KEY",
+        "context_tokens": 1000000,
+        "max_output_tokens": 32768
+      }
+    },
+    "rev": 3
+  },
+  "nodes": [
+    {
+      "id": "start_13cw",
+      "type": "start",
+      "name": "Обновление данных",
+      "x": 40,
+      "y": 40,
+      "enabled": true,
+      "params": {
+        "trigger": "schedule",
+        "accept": "",
+        "max_size_mb": 0,
+        "unpack": false,
+        "dest": "",
+        "output_var": "ctx.run",
+        "payload": "{}",
+        "cron": "0 9 25 6,12 *"
+      },
+      "notes": "Пересборка карты после выхода отчётов USDA (июнь/июль и декабрь) и итогов CONAB/FNC."
+    },
+    {
+      "id": "input_21nv",
+      "type": "input",
+      "name": "USDA: Coffee World Markets and Trade",
+      "x": 350,
+      "y": 40,
+      "enabled": true,
+      "params": {
+        "kind": "file",
+        "method": "GET",
+        "format": "text",
+        "schedule": "once",
+        "interval_s": 60,
+        "on_error": "retry",
+        "idem_store": "db_unique",
+        "idem_window_h": 24,
+        "breaker": "off",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "error",
+        "peak_factor": 1,
+        "env_over": [],
+        "source": "https://www.fas.usda.gov/data/coffee-world-markets-and-trade",
+        "query": "Таблицы Arabica/Robusta production по 12 странам, тыс. мешков 60 кг",
+        "fields": [
+          "country",
+          "season",
+          "arabica",
+          "robusta",
+          "total"
+        ],
+        "dedupe_key": "country+season"
+      },
+      "notes": "Главный источник объёмов: прогноз 2026/27 и ряды 2021/22–2025/26, арабика/робуста по странам. Июль 2026: мир 189,7 млн мешков."
+    },
+    {
+      "id": "input_3zr6",
+      "type": "input",
+      "name": "USDA FAS: годовые обзоры атташе",
+      "x": 350,
+      "y": 170,
+      "enabled": true,
+      "params": {
+        "kind": "scrape",
+        "method": "GET",
+        "format": "html",
+        "schedule": "once",
+        "interval_s": 60,
+        "on_error": "retry",
+        "idem_store": "db_unique",
+        "idem_window_h": 24,
+        "breaker": "off",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "error",
+        "peak_factor": 1,
+        "env_over": [],
+        "source": "https://www.fas.usda.gov/data/search?f[0]=data_type:GAIN",
+        "query": "Coffee Annual 2026",
+        "fields": [
+          "country",
+          "production",
+          "exports",
+          "notes"
+        ],
+        "dedupe_key": "country"
+      },
+      "notes": "Coffee Annual по странам (май–июнь 2026): Эфиопия, Индонезия, Уганда, Индия, Гондурас, Перу, Гватемала, Коста-Рика, Кения, Вьетнам."
+    },
+    {
+      "id": "input_42ta",
+      "type": "input",
+      "name": "ICO Coffee Market Report",
+      "x": 350,
+      "y": 300,
+      "enabled": true,
+      "params": {
+        "kind": "file",
+        "method": "GET",
+        "format": "text",
+        "schedule": "once",
+        "interval_s": 60,
+        "on_error": "retry",
+        "idem_store": "db_unique",
+        "idem_window_h": 24,
+        "breaker": "off",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "error",
+        "peak_factor": 1,
+        "env_over": [],
+        "source": "https://www.ico.org/",
+        "query": "World production, arabica/robusta, баланс рынка",
+        "fields": [
+          "season",
+          "world_production"
+        ],
+        "dedupe_key": "season"
+      },
+      "notes": "Оценка сезона 2025/26: 183,6 млн мешков (сентябрь 2026)."
+    },
+    {
+      "id": "input_5mwf",
+      "type": "input",
+      "name": "CONAB (Бразилия) и FNC (Колумбия)",
+      "x": 350,
+      "y": 430,
+      "enabled": true,
+      "params": {
+        "kind": "scrape",
+        "method": "GET",
+        "format": "html",
+        "schedule": "once",
+        "interval_s": 60,
+        "on_error": "retry",
+        "idem_store": "db_unique",
+        "idem_window_h": 24,
+        "breaker": "off",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "error",
+        "peak_factor": 1,
+        "env_over": [],
+        "source": "https://www.gov.br/conab ; https://federaciondecafeteros.org",
+        "query": "Levantamento safra café; producción año cafetero",
+        "fields": [
+          "country",
+          "season",
+          "total",
+          "arabica",
+          "robusta"
+        ],
+        "dedupe_key": "country+season"
+      },
+      "notes": "Фактические итоги: CONAB, сентябрь 2026 — 67,6 млн (арабика 48,2, конилон 19,4); FNC, октябрь 2026 — 12,65 млн за 2025/26."
+    },
+    {
+      "id": "merge_6az3",
+      "type": "merge",
+      "name": "Все источники",
+      "x": 660,
+      "y": 235,
+      "enabled": true,
+      "params": {
+        "strategy": "all",
+        "timeout_s": 120,
+        "output_var": "ctx.sources"
+      },
+      "notes": ""
+    },
+    {
+      "id": "process_7s0p",
+      "type": "process",
+      "name": "Сведение по 12 странам",
+      "x": 970,
+      "y": 235,
+      "enabled": true,
+      "params": {
+        "op": "join",
+        "on_error": "fail",
+        "retry": 0,
+        "backoff": "exponential",
+        "backoff_s": 1,
+        "backoff_max_s": 30,
+        "jitter": true,
+        "idem_store": "db_unique",
+        "idem_window_h": 24,
+        "breaker": "off",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "error",
+        "publish_mode": "none",
+        "outbox_table": "outbox",
+        "relay": "worker",
+        "relay_interval_s": 1,
+        "outbox_keep_h": 24,
+        "peak_factor": 1,
+        "rule": "Ключ — страна+сезон. Приоритет объёма: таблица USDA (июль) > обзор атташе. Доли арабики/робусты считать из той же таблицы. Гватемала: ряд USDA только по арабике, робуста ≈0,13 млн добавляется по обзору атташе.",
+        "input_var": "ctx.sources",
+        "fields": [
+          "vol",
+          "ara",
+          "rob",
+          "hist"
+        ],
+        "group_by": "country",
+        "output_var": "ctx.countries"
+      },
+      "notes": "Бразилия, Вьетнам, Колумбия, Эфиопия, Индонезия, Уганда, Индия, Гондурас, Перу, Гватемала, Коста-Рика, Кения. Объём на карте — прогноз USDA 2026/27."
+    },
+    {
+      "id": "process_89e3",
+      "type": "process",
+      "name": "Сверка источников",
+      "x": 1280,
+      "y": 235,
+      "enabled": true,
+      "params": {
+        "op": "enrich",
+        "on_error": "fail",
+        "retry": 0,
+        "backoff": "exponential",
+        "backoff_s": 1,
+        "backoff_max_s": 30,
+        "jitter": true,
+        "idem_store": "db_unique",
+        "idem_window_h": 24,
+        "breaker": "off",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "error",
+        "publish_mode": "none",
+        "outbox_table": "outbox",
+        "relay": "worker",
+        "relay_interval_s": 1,
+        "outbox_keep_h": 24,
+        "peak_factor": 1,
+        "rule": "Сравнить USDA с CONAB, FNC, StoneX, Helena Coffee. Если расхождение > 3% — записать в поле check с датой и источником.",
+        "input_var": "ctx.countries",
+        "fields": [
+          "check"
+        ],
+        "output_var": "ctx.checked"
+      },
+      "notes": "Расхождения выводятся в паспорт страны («Сверка с другими источниками»), а не подменяют прогноз."
+    },
+    {
+      "id": "process_99hw",
+      "type": "process",
+      "name": "Динамика 2021/22–2026/27",
+      "x": 1590,
+      "y": 235,
+      "enabled": true,
+      "params": {
+        "op": "aggregate",
+        "on_error": "fail",
+        "retry": 0,
+        "backoff": "exponential",
+        "backoff_s": 1,
+        "backoff_max_s": 30,
+        "jitter": true,
+        "idem_store": "db_unique",
+        "idem_window_h": 24,
+        "breaker": "off",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "error",
+        "publish_mode": "none",
+        "outbox_table": "outbox",
+        "relay": "worker",
+        "relay_interval_s": 1,
+        "outbox_keep_h": 24,
+        "peak_factor": 1,
+        "rule": "Ряд из 6 сезонов на страну; изменение 2026/27 к 2021/22 и к 2025/26; сумма по фильтру обработки.",
+        "input_var": "ctx.checked",
+        "fields": [
+          "hist"
+        ],
+        "group_by": "country",
+        "window": "2021/22..2026/27",
+        "output_var": "ctx.trend"
+      },
+      "notes": "Ряды для графика по сезонам и сумма 12 стран; последний сезон — прогноз (штриховка)."
+    },
+    {
+      "id": "kb_aioh",
+      "type": "kb",
+      "name": "Справочник терруаров",
+      "x": 660,
+      "y": 417,
+      "enabled": true,
+      "params": {
+        "kind": "files",
+        "glob": "page.src.html",
+        "top_k": 5,
+        "chunk_size": 800,
+        "chunk_overlap": 120,
+        "refresh": "manual",
+        "interval_min": 60,
+        "source": "coffee-belt/page.src.html (массив R)"
+      },
+      "notes": "Экспертные оценки: доли методов обработки, высоты, сорта, профиль чашки, календарь сбора. Не официальная статистика."
+    },
+    {
+      "id": "kb_bqyh",
+      "type": "kb",
+      "name": "Контуры стран world-atlas 110m",
+      "x": 1590,
+      "y": 417,
+      "enabled": true,
+      "params": {
+        "kind": "files",
+        "glob": "countries-110m.json",
+        "top_k": 5,
+        "chunk_size": 800,
+        "chunk_overlap": 120,
+        "refresh": "manual",
+        "interval_min": 60,
+        "source": "coffee-belt/countries-110m.json"
+      },
+      "notes": "Natural Earth через world-atlas@2.0.2, без Антарктиды; встраивается в страницу."
+    },
+    {
+      "id": "script_cv4y",
+      "type": "script",
+      "name": "Сборка и предрендер страницы",
+      "x": 1900,
+      "y": 235,
+      "enabled": true,
+      "params": {
+        "runtime": "bash",
+        "code": "python3 build.py && node prerender.cjs",
+        "timeout_s": 120,
+        "output_var": "ctx.page",
+        "on_error": "fail",
+        "retry": 0,
+        "backoff": "exponential",
+        "backoff_s": 1,
+        "backoff_max_s": 30,
+        "jitter": true,
+        "breaker": "off",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "error",
+        "peak_factor": 1,
+        "cwd": "coffee-belt"
+      },
+      "notes": "Страница сохраняется уже отрисованной: карта, паспорт и графики видны даже там, где JavaScript выключен (предпросмотр файлов на iPhone). Библиотеки d3 7.8.5 и topojson 3.0.2 встроены, внешних загрузок нет."
+    },
+    {
+      "id": "sink_dikt",
+      "type": "sink",
+      "name": "Публикация страницы",
+      "x": 2210,
+      "y": 235,
+      "enabled": true,
+      "params": {
+        "channel": "dashboard",
+        "method": "POST",
+        "format": "html",
+        "retry": 2,
+        "backoff": "exponential",
+        "backoff_s": 1,
+        "backoff_max_s": 30,
+        "jitter": true,
+        "on_error": "retry",
+        "idem_store": "db_unique",
+        "idem_window_h": 24,
+        "breaker": "off",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "error",
+        "publish_mode": "none",
+        "outbox_table": "outbox",
+        "relay": "worker",
+        "relay_interval_s": 1,
+        "outbox_keep_h": 24,
+        "peak_factor": 1,
+        "env_over": [],
+        "target": "https://claude.ai/artifact/WrTiVrA15bFr5XjshptF7S",
+        "payload": "предрендеренный coffee-belt.html + d3.min.js + topojson.min.js"
+      },
+      "notes": "Опубликованная версия: https://claude.ai/artifact/WrTiVrA15bFr5XjshptF7S"
+    },
+    {
+      "id": "output_ekog",
+      "type": "output",
+      "name": "Автономный файл coffee-belt.html",
+      "x": 2520,
+      "y": 235,
+      "enabled": true,
+      "params": {
+        "target": "file",
+        "format": "text",
+        "append": false,
+        "path": "coffee-belt.html"
+      },
+      "notes": "Один файл без зависимостей, работает офлайн."
+    },
+    {
+      "id": "note_f9v6",
+      "type": "note",
+      "name": "О проекте",
+      "x": 1280,
+      "y": -101,
+      "enabled": true,
+      "params": {
+        "text": "Кофейный пояс Земли: карта выращивания и производства кофе. 12 крупнейших стран + 39 других стран-производителей, паспорт терруара, фильтр по обработке, слои раскраски, календарь сбора, структура обработки, динамика 2021/22–2026/27. Данные сверены 18.10.2026."
+      },
+      "notes": ""
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_ghvb",
+      "from": {
+        "node": "start_13cw",
+        "port": "out"
+      },
+      "to": {
+        "node": "input_21nv",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_h5f3",
+      "from": {
+        "node": "start_13cw",
+        "port": "out"
+      },
+      "to": {
+        "node": "input_3zr6",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_i8b1",
+      "from": {
+        "node": "start_13cw",
+        "port": "out"
+      },
+      "to": {
+        "node": "input_42ta",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_jwxa",
+      "from": {
+        "node": "start_13cw",
+        "port": "out"
+      },
+      "to": {
+        "node": "input_5mwf",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_kbs1",
+      "from": {
+        "node": "input_21nv",
+        "port": "out"
+      },
+      "to": {
+        "node": "merge_6az3",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_lmjf",
+      "from": {
+        "node": "input_3zr6",
+        "port": "out"
+      },
+      "to": {
+        "node": "merge_6az3",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_mvft",
+      "from": {
+        "node": "input_42ta",
+        "port": "out"
+      },
+      "to": {
+        "node": "merge_6az3",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_nkbr",
+      "from": {
+        "node": "input_5mwf",
+        "port": "out"
+      },
+      "to": {
+        "node": "merge_6az3",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_o4mr",
+      "from": {
+        "node": "merge_6az3",
+        "port": "out"
+      },
+      "to": {
+        "node": "process_7s0p",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_pbiq",
+      "from": {
+        "node": "process_7s0p",
+        "port": "out"
+      },
+      "to": {
+        "node": "process_89e3",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_qo74",
+      "from": {
+        "node": "process_89e3",
+        "port": "out"
+      },
+      "to": {
+        "node": "process_99hw",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_r14e",
+      "from": {
+        "node": "process_99hw",
+        "port": "out"
+      },
+      "to": {
+        "node": "script_cv4y",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_slmq",
+      "from": {
+        "node": "kb_aioh",
+        "port": "data"
+      },
+      "to": {
+        "node": "process_7s0p",
+        "port": "kb"
+      },
+      "kind": "data"
+    },
+    {
+      "id": "e_ty5j",
+      "from": {
+        "node": "kb_bqyh",
+        "port": "data"
+      },
+      "to": {
+        "node": "script_cv4y",
+        "port": "kb"
+      },
+      "kind": "data"
+    },
+    {
+      "id": "e_u30r",
+      "from": {
+        "node": "script_cv4y",
+        "port": "out"
+      },
+      "to": {
+        "node": "sink_dikt",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_v6ep",
+      "from": {
+        "node": "sink_dikt",
+        "port": "out"
+      },
+      "to": {
+        "node": "output_ekog",
+        "port": "in"
+      },
+      "kind": "flow"
+    }
+  ],
+  "seq": 32
+}

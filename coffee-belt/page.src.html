@@ -593,6 +593,7 @@ R.forEach(r => { r.main = STACK_ORDER.reduce((a, k) => r.mix[k] > r.mix[a] ? k :
 const byIso = Object.fromEntries(R.map(r => [r.iso, r]));
 const byId = Object.fromEntries(R.map(r => [r.id, r]));
 const SORTED = [...R].sort((a, b) => b.vol - a.vol);
+window.COFFEE_DATA = R; // для генератора PDF-отчёта (report.cjs)
 // Другие страны, где выращивают кофе (не входят в выборку 12 крупнейших)
 const GROWERS = {
   '484': 'Мексика', '558': 'Никарагуа', '222': 'Сальвадор', '591': 'Панама', '218': 'Эквадор', '068': 'Боливия',

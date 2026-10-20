@@ -2864,7 +2864,9 @@ window.App = (function () {
     /* Привязка к проекту — НИЖЕ, когда projectId уже выбран. Здесь он ещё null,
        и adopt(null) оставлял чек-лист без хранилища: любая отметка молча
        пропадала, потому что писать было некуда. */
-    if (window.CheckState) window.CheckState.onChange(renderChecklistBadge);
+    /* Отметки чек-листа rev плана не двигают, а мост шлёт план только при смене
+       rev — без принудительной отправки MCP видел бы чек-лист до правки. */
+    if (window.CheckState) window.CheckState.onChange(() => { renderChecklistBadge(); bridgePushPlan(true); });
     window.Inspector.init({ onChange: () => {
       window.Graph.pruneEdges();          // порты могли исчезнуть после правки параметров
       commit(); window.Editor.render(); renderConsole();

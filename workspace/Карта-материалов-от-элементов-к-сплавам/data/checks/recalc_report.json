@@ -14,8 +14,7 @@
   {
    "pass": 1,
    "counts": {
-    "ok": 223,
-    "warn": 3,
+    "ok": 225,
     "calc": 32,
     "info": 2
    },
@@ -901,18 +900,6 @@
    "fixable": false
   },
   {
-   "id": "p_allo",
-   "check": "формула H3PO4 в подписи",
-   "law": "элементы формулы ⊆ элементы семейства",
-   "status": "warn",
-   "value": "P",
-   "expected": null,
-   "note": "упомянута в подписи; если это член семейства — добавить H, O в элементы",
-   "field": null,
-   "dataset": null,
-   "fixable": false
-  },
-  {
    "id": "fe_ox",
    "check": "M(FeO)",
    "law": "молярная масса по атомным массам",
@@ -1493,7 +1480,7 @@
    "check": "солидус < Tпл основы",
    "law": "легирование понижает солидус (Fe 1538 °C)",
    "status": "ok",
-   "value": 1140,
+   "value": 1147,
    "expected": "< 1538",
    "note": "",
    "field": "melt_low_C",
@@ -1744,10 +1731,10 @@
    "id": "castiron",
    "check": "солидус = эвтектика Fe–C",
    "law": "диаграмма Fe–C: 1147…1153 °C (константа по памяти)",
-   "status": "warn",
-   "value": 1140,
+   "status": "ok",
+   "value": 1147,
    "expected": "1147…1153",
-   "note": "ниже эвтектики на 7 °C; Si и P сдвигают её, но тогда это не двойная система",
+   "note": "",
    "field": "melt_low_C",
    "dataset": "states",
    "fixable": false
@@ -2284,10 +2271,10 @@
    "id": "sic",
    "check": "числа в тексте пути",
    "law": "подпись совпадает с полями",
-   "status": "warn",
-   "value": "2730",
+   "status": "ok",
+   "value": "—",
    "expected": null,
-   "note": "в «heating_path» нет: 2730",
+   "note": "",
    "field": "heating_path",
    "dataset": "states",
    "fixable": false
@@ -2573,7 +2560,7 @@
    "check": "солидус ≤ ликвидус",
    "law": "нижняя граница плавления не выше верхней",
    "status": "ok",
-   "value": "1140…1250",
+   "value": "1147…1250",
    "expected": null,
    "note": "",
    "field": "melt_low_C",

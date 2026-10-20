@@ -27,8 +27,11 @@ import warnings
 from collections import Counter
 
 warnings.filterwarnings('ignore')
-from mendeleev import element as md_element  # noqa: E402
-from mendeleev.fetch import fetch_table  # noqa: E402
+try:
+    from mendeleev import element as md_element  # noqa: E402
+    from mendeleev.fetch import fetch_table  # noqa: E402
+except ImportError:
+    raise SystemExit('Нет пакета mendeleev — второй базы элементов. Установи: pip install -r requirements.txt')
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 DATA = os.path.join(ROOT, 'data')
@@ -461,6 +464,7 @@ def main():
     ap.add_argument('--apply', action='store_true', help='исправлять точно вычислимое и повторять проход')
     ap.add_argument('--max-iter', type=int, default=3)
     ap.add_argument('--summary-json', action='store_true', help='последней строкой — итог в JSON (для условия цикла в Bench)')
+    ap.add_argument('--strict', action='store_true', help='код выхода 1, если в последнем проходе остались fail или warn')
     a = ap.parse_args()
     E = Elements()
     d, fmt = load()
@@ -490,6 +494,8 @@ def main():
     if a.summary_json:
         last = iterations[-1]
         print(json.dumps({'passes': len(iterations), 'counts': last['counts'], 'applied': len(all_applied)}, ensure_ascii=False))
+    if a.strict and (iterations[-1]['counts'].get('fail') or iterations[-1]['counts'].get('warn')):
+        raise SystemExit(1)
     return report
 
 

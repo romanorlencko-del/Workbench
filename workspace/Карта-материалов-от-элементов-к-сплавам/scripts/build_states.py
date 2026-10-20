@@ -26,7 +26,7 @@ ov('tio2', melt_low_C=1843, melt_high_C=1843, boil_C=2972, decomp_C=None, liquid
    heating_path='анатаз/брукит → рутил (≈600–700 °C) → жидкое (1843 °C) → газ (≈2972 °C)',
    note='Плавление для рутила; анатаз и брукит до плавления не доживают.', source=None)
 ov('sic', melt_low_C=None, melt_high_C=None, boil_C=None, decomp_C=2730, liquid_exists=False,
-   heating_path='твёрдое → разложение на Si (пар) и графит (≈2700–2830 °C)',
+   heating_path='твёрдое → разложение на Si (пар) и графит (≈2730 °C; по источникам 2700–2830 °C)',
    note='Жидкой фазы при 1 атм нет; источники дают 2700–2830 °C, взято ≈2730 °C.', source=None)
 ov('si3n4', melt_low_C=None, melt_high_C=None, boil_C=None, decomp_C=1900, liquid_exists=False,
    heating_path='α → β-Si₃N₄ (≈1400–1600 °C) → разложение на Si и N₂ (≈1900 °C)',
@@ -40,9 +40,12 @@ ov('p_allo', melt_high_C=44, conf=None)
 by['p_allo']['note'] = 'Плавление и кипение — белый P; красный P при 1 атм возгоняется ≈416 °C (плавится ≈590 °C лишь под давлением).'
 ov('fe_allo', boil_C=2862, conf=None); by['fe_allo']['heating_path'] = by['fe_allo']['heating_path'].replace('2861', '2862')
 ov('steel', boil_C=2862, conf=None); by['steel']['heating_path'] = 'твёрдое → двухфазная зона (≈1370–1540 °C) → жидкое → газ (≈2862 °C, основа Fe)'
-ov('castiron', melt_low_C=1140, melt_high_C=1250, conf=None)
-by['castiron']['heating_path'] = 'твёрдое → эвтектика (≈1140–1150 °C) → двухфазная зона → жидкое (ликвидус до ≈1250 °C) → газ (≈2862 °C, основа Fe)'
-by['castiron']['note'] = 'Солидус — эвтектика Fe–C; ликвидус доэвтектических серых чугунов до ≈1250 °C (по памяти).'
+# разбор пересчёта: солидус двойной системы — эвтектика Fe–C (1147 °C метастабильная, 1153 °C стабильная), не 1140
+ov('castiron', melt_low_C=1147, melt_high_C=1250, conf=None)
+by['castiron']['heating_path'] = 'твёрдое → эвтектика (≈1147–1153 °C) → двухфазная зона → жидкое (ликвидус до ≈1250 °C) → газ (≈2862 °C, основа Fe)'
+by['castiron']['note'] = 'Солидус — эвтектика Fe–C (1147 °C с цементитом, 1153 °C с графитом); Si и P её сдвигают. Ликвидус доэвтектических серых чугунов до ≈1250 °C (по памяти).'
+# из цикла пересчёта (обе базы элементов сходятся): кипение Al 2519 °C, у агента было 2470
+ov('al_wr', boil_C=2519, conf=None); by['al_wr']['heating_path'] = by['al_wr']['heating_path'].replace('2470', '2519')
 ov('stainless', melt_high_C=1510, conf=None)
 by['stainless']['heating_path'] = 'твёрдое → двухфазная зона (≈1375–1510 °C) → жидкое → газ (≈2862 °C, основа Fe)'
 by['stainless']['note'] = '304/316 ≈1375–1455 °C (сниппет); ферритная 430 до ≈1510 °C (по памяти).'

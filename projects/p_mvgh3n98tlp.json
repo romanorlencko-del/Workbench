@@ -28,7 +28,7 @@
         "max_output_tokens": 32768
       }
     },
-    "rev": 7
+    "rev": 13
   },
   "nodes": [
     {
@@ -36,7 +36,7 @@
       "type": "input",
       "name": "Справочник элементов",
       "x": 40,
-      "y": 1356,
+      "y": 1660,
       "enabled": true,
       "params": {
         "kind": "file",
@@ -62,7 +62,8 @@
           "kind"
         ],
         "dedupe_key": "symbol",
-        "output_var": "ctx.elements"
+        "output_var": "ctx.elements",
+        "unit": "Рабочая папка карты материалов"
       },
       "notes": "Символ, русское название, тип (металл/неметалл/полуметалл). Фиксированный файл дашборда."
     },
@@ -71,7 +72,7 @@
       "type": "input",
       "name": "Семейства материалов",
       "x": 40,
-      "y": 1579,
+      "y": 1883,
       "enabled": true,
       "params": {
         "kind": "file",
@@ -103,7 +104,8 @@
           "source"
         ],
         "dedupe_key": "id",
-        "output_var": "ctx.families"
+        "output_var": "ctx.families",
+        "unit": "Рабочая папка карты материалов"
       },
       "notes": "34 семейства по 5 уровням: простые вещества → бинарные → сложные → сплавы → композиты; теоретически/известно/применяется."
     },
@@ -112,7 +114,7 @@
       "type": "input",
       "name": "Масштаб мира веществ",
       "x": 40,
-      "y": 1802,
+      "y": 2106,
       "enabled": true,
       "params": {
         "kind": "file",
@@ -139,7 +141,8 @@
           "known"
         ],
         "dedupe_key": "id",
-        "output_var": "ctx.scale"
+        "output_var": "ctx.scale",
+        "unit": "Рабочая папка карты материалов"
       },
       "notes": "Комбинаторика систем из 80 стабильных элементов и размеры баз: IMA, CAS, GNoME, ICSD."
     },
@@ -148,7 +151,7 @@
       "type": "merge",
       "name": "Сводка входов",
       "x": 350,
-      "y": 1599,
+      "y": 1903,
       "enabled": true,
       "params": {
         "strategy": "all",
@@ -162,7 +165,7 @@
       "type": "queue",
       "name": "Партии по 5–6 семейств",
       "x": 660,
-      "y": 1599,
+      "y": 1903,
       "enabled": true,
       "params": {
         "mode": "parallel",
@@ -177,7 +180,8 @@
         "rate_limit": 0,
         "idem_store": "db_unique",
         "idem_window_h": 24,
-        "on_error": "skip"
+        "on_error": "skip",
+        "unit": "Рабочая папка карты материалов"
       },
       "notes": "6 партий параллельно (как в первом прогоне). Партии и их состав — в agents/README.md."
     },
@@ -186,7 +190,7 @@
       "type": "kb",
       "name": "Справочные источники",
       "x": 660,
-      "y": 1835,
+      "y": 2139,
       "enabled": true,
       "params": {
         "kind": "url",
@@ -205,7 +209,7 @@
       "type": "agent",
       "name": "Агенты Haiku: агрегатные состояния",
       "x": 970,
-      "y": 1599,
+      "y": 1903,
       "enabled": true,
       "params": {
         "provider": "anthropic",
@@ -236,7 +240,8 @@
           "web_search",
           "web_fetch",
           "write_file"
-        ]
+        ],
+        "unit": "Рабочая папка карты материалов"
       },
       "notes": "По агенту на партию, с веб-поиском. Промпты первого прогона — agents/batch1..6.prompt.md."
     },
@@ -245,7 +250,7 @@
       "type": "process",
       "name": "Сверка и заполнение пробелов",
       "x": 1280,
-      "y": 1591,
+      "y": 1895,
       "enabled": true,
       "params": {
         "op": "clean",
@@ -284,7 +289,8 @@
           "note",
           "conf",
           "source"
-        ]
+        ],
+        "unit": "Рабочая папка карты материалов"
       },
       "notes": "scripts/build_states.py: сливает партии, правит ошибки, заполняет пустые числа справочными знаниями и ставит метку conf."
     },
@@ -293,7 +299,7 @@
       "type": "store",
       "name": "Датасет phase_states",
       "x": 1590,
-      "y": 1600,
+      "y": 1904,
       "enabled": true,
       "params": {
         "writes": [
@@ -318,7 +324,8 @@
         "relay_interval_s": 1,
         "outbox_keep_h": 24,
         "peak_factor": 1,
-        "env_over": []
+        "env_over": [],
+        "unit": "Рабочая папка карты материалов"
       },
       "notes": "Локальная копия: data/phase_states.json. На дашборде — датасет states (фиксированный файл)."
     },
@@ -339,7 +346,7 @@
       "type": "agent",
       "name": "Агенты Haiku: применение и названия",
       "x": 970,
-      "y": 1783,
+      "y": 2087,
       "enabled": true,
       "params": {
         "provider": "anthropic",
@@ -369,7 +376,8 @@
         "tools": [
           "web_search",
           "write_file"
-        ]
+        ],
+        "unit": "Рабочая папка карты материалов"
       },
       "notes": "По агенту на партию (те же 6 партий). Отрасли — только из фиксированного списка (VOCAB в scripts/build_apps.py)."
     },
@@ -378,7 +386,7 @@
       "type": "process",
       "name": "Сверка: применение",
       "x": 1280,
-      "y": 1844,
+      "y": 2148,
       "enabled": true,
       "params": {
         "op": "clean",
@@ -415,7 +423,8 @@
           "note",
           "conf",
           "source"
-        ]
+        ],
+        "unit": "Рабочая папка карты материалов"
       },
       "notes": "scripts/build_apps.py: проверка отраслей по словарю, ручные правки (ГОСТ 4404 у углерода, отрасли цемента и Al–SiC, ПОИ у припоев)."
     },
@@ -424,7 +433,7 @@
       "type": "store",
       "name": "Датасет applications",
       "x": 1590,
-      "y": 1853,
+      "y": 2157,
       "enabled": true,
       "params": {
         "writes": [
@@ -449,7 +458,8 @@
         "relay_interval_s": 1,
         "outbox_keep_h": 24,
         "peak_factor": 1,
-        "env_over": []
+        "env_over": [],
+        "unit": "Рабочая папка карты материалов"
       },
       "notes": "Локально: data/applications.json. На дашборде — датасет apps (матрица «семейство × отрасль», фильтр по отрасли, колонки таблицы)."
     },
@@ -458,7 +468,7 @@
       "type": "entity",
       "name": "Сущность: элемент",
       "x": 40,
-      "y": 741,
+      "y": 1045,
       "enabled": true,
       "params": {
         "fields": [
@@ -490,7 +500,7 @@
           "ctx.elements"
         ],
         "id_field": "symbol",
-        "owner": "справочник элементов"
+        "owner": "Рабочая папка карты материалов"
       },
       "notes": ""
     },
@@ -499,7 +509,7 @@
       "type": "entity",
       "name": "Сущность: семейство материалов",
       "x": 40,
-      "y": 864,
+      "y": 1168,
       "enabled": true,
       "params": {
         "fields": [
@@ -588,7 +598,7 @@
           "ctx.families"
         ],
         "id_field": "id",
-        "owner": "сводка семейств"
+        "owner": "Рабочая папка карты материалов"
       },
       "notes": ""
     },
@@ -597,7 +607,7 @@
       "type": "entity",
       "name": "Сущность: слой масштаба",
       "x": 40,
-      "y": 987,
+      "y": 1291,
       "enabled": true,
       "params": {
         "fields": [
@@ -650,7 +660,7 @@
           "ctx.scale"
         ],
         "id_field": "id",
-        "owner": "сводка масштаба"
+        "owner": "Рабочая папка карты материалов"
       },
       "notes": ""
     },
@@ -659,7 +669,7 @@
       "type": "entity",
       "name": "Сущность: агрегатное состояние",
       "x": 40,
-      "y": 1110,
+      "y": 1414,
       "enabled": true,
       "params": {
         "fields": [
@@ -745,7 +755,7 @@
           "ctx.states"
         ],
         "id_field": "id",
-        "owner": "Сверка и заполнение пробелов"
+        "owner": "Рабочая папка карты материалов"
       },
       "notes": ""
     },
@@ -754,7 +764,7 @@
       "type": "entity",
       "name": "Сущность: применение",
       "x": 40,
-      "y": 1233,
+      "y": 1537,
       "enabled": true,
       "params": {
         "fields": [
@@ -820,7 +830,7 @@
           "ctx.apps"
         ],
         "id_field": "id",
-        "owner": "Сверка: применение"
+        "owner": "Рабочая папка карты материалов"
       },
       "notes": ""
     },
@@ -829,7 +839,7 @@
       "type": "decision",
       "name": "Решение: метка вместо отказа",
       "x": 40,
-      "y": 317,
+      "y": 628,
       "enabled": true,
       "params": {
         "status": "trial",
@@ -852,7 +862,7 @@
       "type": "decision",
       "name": "Решение: словарь отраслей",
       "x": 40,
-      "y": 464,
+      "y": 775,
       "enabled": true,
       "params": {
         "status": "accepted",
@@ -894,8 +904,8 @@
       "id": "output_11vxp",
       "type": "output",
       "name": "Итог: ссылка на дашборд",
-      "x": 2830,
-      "y": 1809,
+      "x": 3140,
+      "y": 2158,
       "enabled": true,
       "params": {
         "target": "console",
@@ -909,7 +919,7 @@
       "type": "kb",
       "name": "Таблица Менделеева (локально)",
       "x": 1900,
-      "y": 1809,
+      "y": 2149,
       "enabled": true,
       "params": {
         "kind": "files",
@@ -928,7 +938,7 @@
       "type": "loop",
       "name": "Цикл пересчёта",
       "x": 1900,
-      "y": 1627,
+      "y": 1896,
       "enabled": true,
       "params": {
         "mode": "while",
@@ -945,7 +955,7 @@
       "type": "script",
       "name": "Пересчёт по таблице Менделеева и законам",
       "x": 2210,
-      "y": 1627,
+      "y": 1896,
       "enabled": true,
       "params": {
         "runtime": "python",
@@ -965,16 +975,17 @@
         "breaker_probe": 1,
         "breaker_fallback": "error",
         "peak_factor": 1,
-        "cwd": "workspace/Карта-материалов-от-элементов-к-сплавам"
+        "cwd": "workspace/Карта-материалов-от-элементов-к-сплавам",
+        "unit": "Рабочая папка карты материалов"
       },
-      "notes": "scripts/recalc.py. Проверки: комбинаторика C(80,k) и число стабильных элементов по изотопам; применяется ≤ известно ≤ теоретически; тип элемента по серии; формулы ⊆ элементы семейства и молярные массы; T пл/кип чистых элементов и основ сплавов по обеим базам; солидус < Tпл основы, ликвидус ≤ Tпл основы (кроме изоморфных систем); эвтектики Fe–C и Sn–Bi; правила Трутона и Ричардса; согласованность фаз и чисел в тексте. Исправляет только точно вычислимое."
+      "notes": "scripts/recalc.py. Проверки: комбинаторика C(80,k) и число стабильных элементов по изотопам; применяется ≤ известно ≤ теоретически; тип элемента по серии; формулы ⊆ элементы семейства и молярные массы; T пл/кип чистых элементов и основ сплавов по обеим базам; солидус < Tпл основы, ликвидус ≤ Tпл основы (кроме изоморфных систем); эвтектики Fe–C и Sn–Bi; правила Трутона и Ричардса; согласованность фаз. --strict: код выхода 1, если остались fail или warn."
     },
     {
       "id": "condition_16ony",
       "type": "condition",
       "name": "Остались ошибки?",
       "x": 2520,
-      "y": 1627,
+      "y": 1908,
       "enabled": true,
       "params": {
         "expression": "(ctx.recalc.counts.fail || 0) > 0",
@@ -987,7 +998,7 @@
       "type": "task",
       "name": "Разбор расхождений",
       "x": 2830,
-      "y": 1627,
+      "y": 1896,
       "enabled": true,
       "params": {
         "output_var": "ctx.recalc_review",
@@ -1008,50 +1019,17 @@
         "instruction": "Открыть data/checks/recalc_report.md, по каждой ошибке найти первоисточник, исправить data/*.json или правило в scripts/recalc.py и вернуть управление в цикл.",
         "inputs": [
           "ctx.recalc"
-        ]
+        ],
+        "unit": "Рабочая папка карты материалов"
       },
       "notes": "Ошибки, которые модуль не может исправить сам: решить по первоисточнику, поправить данные или правило в recalc.py."
-    },
-    {
-      "id": "store_18xew",
-      "type": "store",
-      "name": "Отчёт пересчёта",
-      "x": 2210,
-      "y": 1757,
-      "enabled": true,
-      "params": {
-        "writes": [
-          "находки"
-        ],
-        "dataset": "recalc_report",
-        "anonymize": true,
-        "target": "sqlite",
-        "uri": "workspace/Карта-материалов-от-элементов-к-сплавам/data/checks/recalc_report.json",
-        "keep": "forever",
-        "keep_days": 365,
-        "dedupe_key": "project_id + file + rule + code_hash",
-        "versioning": true,
-        "redact_secrets": true,
-        "store_snippets": false,
-        "output_var": "ctx.recalc_ver",
-        "idem_store": "db_unique",
-        "idem_window_h": 24,
-        "publish_mode": "none",
-        "outbox_table": "outbox",
-        "relay": "worker",
-        "relay_interval_s": 1,
-        "outbox_keep_h": 24,
-        "peak_factor": 1,
-        "env_over": []
-      },
-      "notes": "data/checks/recalc_report.json и .md, data/derived.json (молярные массы и массовые доли)."
     },
     {
       "id": "sink_19j7m",
       "type": "sink",
       "name": "Дашборд «Карта материалов»",
-      "x": 2520,
-      "y": 1819,
+      "x": 2830,
+      "y": 2149,
       "enabled": true,
       "params": {
         "channel": "dashboard",
@@ -1078,7 +1056,8 @@
         "outbox_keep_h": 24,
         "peak_factor": 1,
         "env_over": [],
-        "target": "https://claude.ai/artifact/6gJVkczyWaovoJUXbKnuzV"
+        "target": "https://claude.ai/artifact/6gJVkczyWaovoJUXbKnuzV",
+        "unit": "Рабочая папка карты материалов"
       },
       "notes": "Страница — dashboard/index.html, документы датасетов — dashboard/store/. Обновление: загрузить файл в ассеты и поменять url датасета."
     },
@@ -1087,7 +1066,7 @@
       "type": "entity",
       "name": "Сущность: находка проверки",
       "x": 40,
-      "y": 611,
+      "y": 922,
       "enabled": true,
       "params": {
         "fields": [
@@ -1163,7 +1142,7 @@
           "ctx.recalc"
         ],
         "id_field": "id",
-        "owner": "Пересчёт по таблице Менделеева и законам"
+        "owner": "Рабочая папка карты материалов"
       },
       "notes": ""
     },
@@ -1190,6 +1169,198 @@
         "revisit": "когда появятся открытые первоисточники — добавить их третьей базой и расширить автоисправление"
       },
       "notes": ""
+    },
+    {
+      "id": "store_1nrat",
+      "type": "store",
+      "name": "Отчёт пересчёта",
+      "x": 2210,
+      "y": 2097,
+      "enabled": true,
+      "params": {
+        "writes": [
+          "находки"
+        ],
+        "dataset": "recalc_report",
+        "anonymize": true,
+        "target": "sqlite",
+        "uri": "workspace/Карта-материалов-от-элементов-к-сплавам/data/checks/recalc_report.json",
+        "keep": "forever",
+        "keep_days": 365,
+        "dedupe_key": "project_id + file + rule + code_hash",
+        "versioning": true,
+        "redact_secrets": true,
+        "store_snippets": false,
+        "output_var": "ctx.recalc_ver",
+        "idem_store": "db_unique",
+        "idem_window_h": 24,
+        "publish_mode": "none",
+        "outbox_table": "outbox",
+        "relay": "worker",
+        "relay_interval_s": 1,
+        "outbox_keep_h": 24,
+        "peak_factor": 1,
+        "env_over": [],
+        "unit": "Рабочая папка карты материалов"
+      },
+      "notes": "data/checks/recalc_report.json и .md, data/derived.json (молярные массы и массовые доли)."
+    },
+    {
+      "id": "script_1oc6u",
+      "type": "script",
+      "name": "Сверка со словарём данных",
+      "x": 2520,
+      "y": 2137,
+      "enabled": true,
+      "params": {
+        "runtime": "python",
+        "code": "python3 scripts/check_entities.py",
+        "timeout_s": 60,
+        "output_var": "ctx.dictionary_ok",
+        "on_error": "fail",
+        "retry": 0,
+        "backoff": "exponential",
+        "backoff_s": 1,
+        "backoff_max_s": 30,
+        "jitter": true,
+        "breaker": "off",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "error",
+        "peak_factor": 1,
+        "cwd": "workspace/Карта-материалов-от-элементов-к-сплавам",
+        "unit": "Рабочая папка карты материалов"
+      },
+      "notes": "scripts/check_entities.py: каждый датасет против своей сущности плана — обязательные поля, типы, списки значений, ссылки (элементы семейства ⊆ справочник, id состояний и применений ⊆ семейства), отрасли ⊆ словарь. Красная — дашборд не обновляем."
+    },
+    {
+      "id": "note_1p8kx",
+      "type": "note",
+      "name": "Рамки проекта",
+      "x": 660,
+      "y": -60,
+      "enabled": true,
+      "params": {
+        "text": "Идея: карта материалов от элементов к сплавам и композитам — сколько форм возможно, известно и применяется, как ведут себя при нагреве и где используются; для себя, как справочник.\nФормат: личный, локальный. Платформы: Web (дашборд-артефакт) + CLI (скрипты Python в рабочей папке).\nНе цели: не база свойств уровня справочника (теплопроводность, прочность, цены не собираем); не полный перечень марок; не прогноз новых материалов; не онлайн-обновление.\nГотово, когда: (1) все 34 семейства в 4 датасетах, (2) пересчёт по таблице Менделеева без fail и warn, (3) датасеты соблюдают словарь данных, (4) данные воспроизводятся из data/raw* скриптами сборки, (5) дашборд показывает текущие файлы. Метки «по памяти» — не блокер, а список доработки (блок «Что доработать»)."
+      },
+      "notes": ""
+    },
+    {
+      "id": "decision_1qhjo",
+      "type": "decision",
+      "name": "Решение: правки только в скриптах сборки",
+      "x": 40,
+      "y": 334,
+      "enabled": true,
+      "params": {
+        "status": "accepted",
+        "title": "ручные и автоматические правки живут в build_*.py, а не только в датасете",
+        "date": "2026-10-20",
+        "affects": [
+          "process_857z",
+          "process_mrfm",
+          "task_17fvh",
+          "loop_143lc"
+        ],
+        "context": "цикл пересчёта поправил кипение Al прямо в phase_states.json; повторная сборка из data/raw вернула бы 2470 °C",
+        "rejected": "править только датасет — пересборка молча откатывает правку;\nне пересобирать из raw — теряется связь числа с ответом агента",
+        "costs": "каждая правка из разбора — строка ov(...) в build_states.py с причиной в комментарии",
+        "revisit": "если правок станет больше, чем ответов агентов, — вынести их в отдельный файл overrides.json"
+      },
+      "notes": ""
+    },
+    {
+      "id": "unit_1u492",
+      "type": "unit",
+      "name": "Рабочая папка карты материалов",
+      "x": 40,
+      "y": 2459,
+      "enabled": true,
+      "params": {
+        "replicas": 1,
+        "ports": [],
+        "network": "deny_by_default",
+        "wait_for": "healthy",
+        "restart": "no",
+        "restart_max": 5,
+        "restart_delay_s": 5,
+        "health": "cmd",
+        "health_path": "/healthz",
+        "health_port": 8080,
+        "health_interval_s": 10,
+        "health_timeout_s": 3,
+        "health_retries": 3,
+        "start_period_s": 20,
+        "cpu_limit": 1,
+        "mem_limit_mb": 512,
+        "stop_grace_s": 10,
+        "log_level": "info",
+        "env_over": [],
+        "name": "Рабочая папка карты материалов",
+        "owner": "владелец проекта",
+        "image": "python3 + requirements.txt (mendeleev 1.3.0), без контейнера",
+        "egress_external": [
+          "claude.ai"
+        ],
+        "health_cmd": "python3 scripts/check_entities.py && python3 scripts/check_repro.py && python3 scripts/recalc.py --max-iter 1 --strict",
+        "logs_to": "Журналы проверок"
+      },
+      "notes": "Единственная единица развёртывания: папка workspace/Карта-материалов-от-элементов-к-сплавам с Python-скриптами и данными. Сервера нет — всё запускается руками из этой папки; живой результат — дашборд-артефакт."
+    },
+    {
+      "id": "decision_1vpiw",
+      "type": "decision",
+      "name": "Решение: синхронный конвейер без брокера",
+      "x": 40,
+      "y": 481,
+      "enabled": true,
+      "params": {
+        "status": "accepted",
+        "title": "шаги идут подряд в одном процессе, без очереди сообщений между ними",
+        "date": "2026-10-20",
+        "affects": [
+          "merge_49y5",
+          "process_857z",
+          "loop_143lc",
+          "script_1oc6u",
+          "sink_19j7m"
+        ],
+        "context": "конвейер пакетный и локальный: запускается руками раз в несколько дней, данные — файлы в одной папке; встроенная проверка Bench просит брокер в цепочке из 11 блоков",
+        "rejected": "брокер между шагами — отдельная служба ради прогона, который длится секунды; упавший шаг проще перезапустить",
+        "costs": "сбой любого шага останавливает прогон целиком; повтор — с начала, данные при этом не портятся: шаги пишут файлы атомарно и идемпотентно",
+        "revisit": "если сбор станет регулярным по расписанию или агенты будут работать часами — поставить очередь между сбором и сверкой"
+      },
+      "notes": ""
+    },
+    {
+      "id": "monitor_1wi2q",
+      "type": "monitor",
+      "name": "Журналы проверок",
+      "x": 40,
+      "y": 2329,
+      "enabled": true,
+      "params": {
+        "sink": "file",
+        "format": "json",
+        "correlation_key": "id",
+        "fields": [
+          "id",
+          "check",
+          "law",
+          "status",
+          "dataset",
+          "field"
+        ],
+        "retention_days": 365,
+        "sampling_pct": 100,
+        "alerts": [],
+        "env_over": [],
+        "name": "Журналы проверок",
+        "endpoint": "data/checks/"
+      },
+      "notes": "Логов как службы нет: следы прогона — файлы проверок в data/checks/ (recalc_report.json/.md) и история git. Тревога — fail или warn в отчёте пересчёта и ненулевой код check_entities.py."
     }
   ],
   "edges": [
@@ -1422,30 +1593,6 @@
       "kind": "flow"
     },
     {
-      "id": "e_1j3gf",
-      "from": {
-        "node": "loop_143lc",
-        "port": "done"
-      },
-      "to": {
-        "node": "store_18xew",
-        "port": "in"
-      },
-      "kind": "flow"
-    },
-    {
-      "id": "e_1kbl2",
-      "from": {
-        "node": "store_18xew",
-        "port": "out"
-      },
-      "to": {
-        "node": "sink_19j7m",
-        "port": "in"
-      },
-      "kind": "flow"
-    },
-    {
       "id": "e_1lv1u",
       "from": {
         "node": "store_np3v",
@@ -1468,7 +1615,43 @@
         "port": "in"
       },
       "kind": "flow"
+    },
+    {
+      "id": "e_1rc3v",
+      "from": {
+        "node": "loop_143lc",
+        "port": "body"
+      },
+      "to": {
+        "node": "store_1nrat",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_1sc6c",
+      "from": {
+        "node": "store_1nrat",
+        "port": "out"
+      },
+      "to": {
+        "node": "script_1oc6u",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_1t1jk",
+      "from": {
+        "node": "script_1oc6u",
+        "port": "out"
+      },
+      "to": {
+        "node": "sink_19j7m",
+        "port": "in"
+      },
+      "kind": "flow"
     }
   ],
-  "seq": 59
+  "seq": 69
 }

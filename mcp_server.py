@@ -363,7 +363,7 @@ def call_tool(name, args):
             except Exception:
                 pass
         rep = {"id": args["id"]}
-        for k in ("status", "files", "checks", "note", "owner", "spec_rev"):
+        for k in ("status", "files", "checks", "checks_ok", "checks_out", "note", "owner", "spec_rev"):
             if args.get(k) is not None:
                 rep[k] = args[k]
         _push_ops({"build": [rep]})

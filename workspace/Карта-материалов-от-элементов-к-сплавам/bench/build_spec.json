@@ -1,0 +1,389 @@
+[
+ {
+  "id": "input_1f4n",
+  "files": [
+   "data/elements.json"
+  ],
+  "checks": [
+   "python3 scripts/check_entities.py"
+  ],
+  "note": "39 элементов: символ, название, тип; форма сверена с сущностью «элемент»"
+ },
+ {
+  "id": "input_215i",
+  "files": [
+   "data/materials.json"
+  ],
+  "checks": [
+   "python3 scripts/check_entities.py",
+   "python3 scripts/recalc.py --max-iter 1 --strict"
+  ],
+  "note": "34 семейства по 5 уровням; подпись фосфора без формулы H₃PO₄ (продукт, не член семейства)"
+ },
+ {
+  "id": "input_3p83",
+  "files": [
+   "data/scale.json"
+  ],
+  "checks": [
+   "python3 scripts/check_entities.py",
+   "python3 scripts/recalc.py --max-iter 1 --strict"
+  ],
+  "note": "7 слоёв масштаба; комбинаторика C(80,k) сверена пересчётом"
+ },
+ {
+  "id": "merge_49y5",
+  "files": [
+   "agents/README.md"
+  ],
+  "checks": [
+   "python3 scripts/check_entities.py"
+  ],
+  "note": "три справочника читаются вместе: ссылки семейств на элементы и id состояний/применений на семейства целы"
+ },
+ {
+  "id": "queue_5uw1",
+  "files": [
+   "agents/README.md",
+   "data/raw/batch1.json",
+   "data/raw/batch2.json",
+   "data/raw/batch3.json",
+   "data/raw/batch4.json",
+   "data/raw/batch5.json",
+   "data/raw/batch6.json",
+   "data/raw_apps/batch1.json",
+   "data/raw_apps/batch2.json",
+   "data/raw_apps/batch3.json",
+   "data/raw_apps/batch4.json",
+   "data/raw_apps/batch5.json",
+   "data/raw_apps/batch6.json"
+  ],
+  "checks": [
+   "python3 scripts/check_repro.py"
+  ],
+  "note": "6 партий × 2 ветки; партии покрывают ровно 34 семейства"
+ },
+ {
+  "id": "kb_6oab",
+  "files": [],
+  "status": "wip",
+  "note": "источники заданы, но страницы не открывались (сетевая политика облака) — агенты видели только сниппеты поиска; перепроверка по открытым страницам — в «Что доработать»"
+ },
+ {
+  "id": "agent_72rw",
+  "files": [
+   "data/raw/batch1.json",
+   "data/raw/batch2.json",
+   "data/raw/batch3.json",
+   "data/raw/batch4.json",
+   "data/raw/batch5.json",
+   "data/raw/batch6.json",
+   "agents/README.md"
+  ],
+  "checks": [
+   "python3 scripts/check_repro.py"
+  ],
+  "note": "ответы Haiku сохранены как есть в data/raw; итог из них воспроизводится сборкой"
+ },
+ {
+  "id": "process_857z",
+  "files": [
+   "scripts/build_states.py"
+  ],
+  "checks": [
+   "python3 scripts/check_repro.py",
+   "python3 scripts/check_entities.py"
+  ],
+  "note": "сборка phase_states из raw с ручными правками; перенесены правки цикла (Al 2519 °C) и разбора (чугун 1147 °C, SiC ≈2730 °C в пути)"
+ },
+ {
+  "id": "store_9m0l",
+  "files": [
+   "data/phase_states.json"
+  ],
+  "checks": [
+   "python3 scripts/check_entities.py",
+   "python3 scripts/check_repro.py"
+  ],
+  "note": "34 строки; загружено на дашборд (датасет states, 2026-10-20 21:40 UTC)"
+ },
+ {
+  "id": "agent_l5uf",
+  "files": [
+   "data/raw_apps/batch1.json",
+   "data/raw_apps/batch2.json",
+   "data/raw_apps/batch3.json",
+   "data/raw_apps/batch4.json",
+   "data/raw_apps/batch5.json",
+   "data/raw_apps/batch6.json"
+  ],
+  "checks": [
+   "python3 scripts/check_repro.py"
+  ],
+  "note": "ответы Haiku о применении сохранены как есть в data/raw_apps"
+ },
+ {
+  "id": "process_mrfm",
+  "files": [
+   "scripts/build_apps.py"
+  ],
+  "checks": [
+   "python3 scripts/check_repro.py",
+   "python3 scripts/check_entities.py"
+  ],
+  "note": "сборка applications; отрасли только из словаря"
+ },
+ {
+  "id": "store_np3v",
+  "files": [
+   "data/applications.json"
+  ],
+  "checks": [
+   "python3 scripts/check_entities.py",
+   "python3 scripts/check_repro.py"
+  ],
+  "note": "34 строки; на дашборде — датасет apps"
+ },
+ {
+  "id": "kb_13s90",
+  "files": [
+   "vendor/pymatgen_periodic_table.json.gz",
+   "vendor/README.md",
+   "requirements.txt"
+  ],
+  "checks": [
+   "python3 scripts/recalc.py --max-iter 1 --strict"
+  ],
+  "note": "обе базы элементов доступны без сети: mendeleev 1.3.0 и таблица pymatgen-core"
+ },
+ {
+  "id": "script_15fad",
+  "files": [
+   "scripts/recalc.py"
+  ],
+  "checks": [
+   "python3 scripts/recalc.py --max-iter 1 --strict"
+  ],
+  "note": "пересчёт: 259 находок, ok 225, calc 32, info 2, fail 0, warn 0; добавлен --strict и понятная ошибка без mendeleev"
+ },
+ {
+  "id": "condition_16ony",
+  "files": [
+   "scripts/recalc.py"
+  ],
+  "checks": [
+   "python3 scripts/recalc.py --max-iter 1 --strict"
+  ],
+  "note": "ошибок без точного ответа нет — ветка «на разбор» сейчас пустая"
+ },
+ {
+  "id": "loop_143lc",
+  "files": [
+   "scripts/recalc.py"
+  ],
+  "checks": [
+   "python3 scripts/recalc.py --apply --max-iter 3 --summary-json --strict"
+  ],
+  "note": "цикл сходится за 1 проход: исправлять нечего"
+ },
+ {
+  "id": "task_17fvh",
+  "files": [
+   "scripts/build_states.py",
+   "data/materials.json",
+   "data/checks/recalc_report.md"
+  ],
+  "checks": [
+   "python3 scripts/recalc.py --max-iter 1 --strict",
+   "python3 scripts/check_repro.py"
+  ],
+  "note": "разобраны 3 предупреждения: солидус чугуна 1140 → 1147 °C (эвтектика Fe–C), в пути SiC указано ≈2730 °C, H₃PO₄ в подписи фосфора заменена словами"
+ },
+ {
+  "id": "store_1nrat",
+  "files": [
+   "data/checks/recalc_report.json",
+   "data/checks/recalc_report.md",
+   "data/derived.json"
+  ],
+  "checks": [
+   "python3 scripts/recalc.py --max-iter 1 --strict"
+  ],
+  "note": "отчёт пересчёта и молярные массы 32 формул"
+ },
+ {
+  "id": "script_1oc6u",
+  "files": [
+   "scripts/check_entities.py"
+  ],
+  "checks": [
+   "python3 scripts/check_entities.py"
+  ],
+  "note": "6 сущностей против 6 датасетов; на испорченной копии ловит 4 нарушения из 4"
+ },
+ {
+  "id": "sink_19j7m",
+  "files": [
+   "dashboard/index.html",
+   "dashboard/store/dash/meta.json",
+   "dashboard/store/dash/params.json",
+   "dashboard/store/datasets/apps.json",
+   "dashboard/store/datasets/elements.json",
+   "dashboard/store/datasets/materials.json",
+   "dashboard/store/datasets/scale.json",
+   "dashboard/store/datasets/states.json"
+  ],
+  "note": "phase_states.json и materials.json загружены в ассеты дашборда, датасеты states и materials переключены на них; страница дашборда своей проверки (check) не прислала — данные на ней проверены только по файлам"
+ },
+ {
+  "id": "output_11vxp",
+  "files": [
+   "README.md"
+  ],
+  "checks": [
+   "grep -q 6gJVkczyWaovoJUXbKnuzV README.md"
+  ],
+  "note": "ссылка на дашборд — в README и в блоке «Дашборд»"
+ },
+ {
+  "id": "entity_t8ij",
+  "files": [
+   "scripts/check_entities.py"
+  ],
+  "checks": [
+   "python3 scripts/check_entities.py"
+  ],
+  "note": "датасет соответствует сущности: поля, типы, списки значений, ссылки"
+ },
+ {
+  "id": "entity_u1nr",
+  "files": [
+   "scripts/check_entities.py"
+  ],
+  "checks": [
+   "python3 scripts/check_entities.py"
+  ],
+  "note": "датасет соответствует сущности: поля, типы, списки значений, ссылки"
+ },
+ {
+  "id": "entity_v8da",
+  "files": [
+   "scripts/check_entities.py"
+  ],
+  "checks": [
+   "python3 scripts/check_entities.py"
+  ],
+  "note": "датасет соответствует сущности: поля, типы, списки значений, ссылки"
+ },
+ {
+  "id": "entity_w1rd",
+  "files": [
+   "scripts/check_entities.py"
+  ],
+  "checks": [
+   "python3 scripts/check_entities.py"
+  ],
+  "note": "датасет соответствует сущности: поля, типы, списки значений, ссылки"
+ },
+ {
+  "id": "entity_xzwz",
+  "files": [
+   "scripts/check_entities.py"
+  ],
+  "checks": [
+   "python3 scripts/check_entities.py"
+  ],
+  "note": "датасет соответствует сущности: поля, типы, списки значений, ссылки"
+ },
+ {
+  "id": "entity_1a7v1",
+  "files": [
+   "scripts/check_entities.py"
+  ],
+  "checks": [
+   "python3 scripts/check_entities.py"
+  ],
+  "note": "датасет соответствует сущности: поля, типы, списки значений, ссылки"
+ },
+ {
+  "id": "decision_yv9w",
+  "files": [
+   "data/phase_states.json",
+   "data/applications.json"
+  ],
+  "checks": [
+   "python3 scripts/check_entities.py"
+  ],
+  "note": "метка conf обязательна и из списка — проверяет словарь данных"
+ },
+ {
+  "id": "decision_z0tu",
+  "files": [
+   "scripts/build_apps.py"
+  ],
+  "checks": [
+   "python3 scripts/check_entities.py"
+  ],
+  "note": "отрасли вне словаря ловит и сборка, и проверка словаря"
+ },
+ {
+  "id": "decision_10u94",
+  "files": [
+   "scripts/build_states.py"
+  ],
+  "checks": [
+   "python3 -c \"import json,sys; sys.exit(any((r['boil_C'] or 0) > 5000 for r in json.load(open('data/phase_states.json'))))\""
+  ],
+  "note": "ни одного boil_C > 5000 °C на шкале; WC ≈6000 °C — только в тексте"
+ },
+ {
+  "id": "decision_1bgnf",
+  "files": [
+   "scripts/recalc.py"
+  ],
+  "checks": [
+   "python3 scripts/recalc.py --max-iter 1 --strict"
+  ],
+  "note": "цикл правит только вычислимое; спорное ушло в «Разбор расхождений»"
+ },
+ {
+  "id": "decision_1qhjo",
+  "files": [
+   "scripts/build_states.py",
+   "scripts/check_repro.py"
+  ],
+  "checks": [
+   "python3 scripts/check_repro.py"
+  ],
+  "note": "все правки в build_*.py; check_repro.py ловит правку мимо сборки"
+ },
+ {
+  "id": "decision_1vpiw",
+  "files": [],
+  "note": "принято: пакетный локальный прогон без брокера; пересмотреть при запуске по расписанию"
+ },
+ {
+  "id": "unit_1u492",
+  "files": [
+   ".bench-project.json",
+   "requirements.txt",
+   "README.md"
+  ],
+  "checks": [
+   "python3 scripts/check_entities.py",
+   "python3 scripts/check_repro.py",
+   "python3 scripts/recalc.py --max-iter 1 --strict"
+  ],
+  "note": "контур — рабочая папка; проверка живости = три проверки проекта"
+ },
+ {
+  "id": "monitor_1wi2q",
+  "files": [
+   "data/checks/recalc_report.json"
+  ],
+  "checks": [
+   "test -s data/checks/recalc_report.json"
+  ],
+  "note": "журнал проверок — data/checks/ и история git"
+ }
+]

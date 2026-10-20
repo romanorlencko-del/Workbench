@@ -1,0 +1,959 @@
+{
+  "v": 1,
+  "projectId": "p_mvgh3n98tlp",
+  "updatedAt": 1792531984303,
+  "root": "",
+  "nodes": {
+    "input_1f4n": {
+      "status": "done",
+      "target": [
+        "data/elements.json"
+      ],
+      "checks": "python3 scripts/check_entities.py",
+      "checks_ok": true,
+      "checks_at": 1792531798305,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531798305,
+          "text": "claude · 39 элементов: символ, название, тип; форма сверена с сущностью «элемент» · проверки зелёные"
+        },
+        {
+          "ts": 1792531796514,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531798305,
+      "spec_rev": "1kyg3do",
+      "deps": {},
+      "spec_at": 1792531798306
+    },
+    "input_215i": {
+      "status": "done",
+      "target": [
+        "data/materials.json"
+      ],
+      "checks": "python3 scripts/check_entities.py\npython3 scripts/recalc.py --max-iter 1 --strict",
+      "checks_ok": true,
+      "checks_at": 1792531811803,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531811803,
+          "text": "claude · 34 семейства по 5 уровням; подпись фосфора без формулы H₃PO₄ (продукт, не член семейства) · проверки зелёные"
+        },
+        {
+          "ts": 1792531798805,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531811803,
+      "spec_rev": "1449085",
+      "deps": {},
+      "spec_at": 1792531811803
+    },
+    "input_3p83": {
+      "status": "done",
+      "target": [
+        "data/scale.json"
+      ],
+      "checks": "python3 scripts/check_entities.py\npython3 scripts/recalc.py --max-iter 1 --strict",
+      "checks_ok": true,
+      "checks_at": 1792531825303,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531825303,
+          "text": "claude · 7 слоёв масштаба; комбинаторика C(80,k) сверена пересчётом · проверки зелёные"
+        },
+        {
+          "ts": 1792531812309,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531825303,
+      "spec_rev": "zmzxeb",
+      "deps": {},
+      "spec_at": 1792531825303
+    },
+    "merge_49y5": {
+      "status": "done",
+      "target": [
+        "agents/README.md"
+      ],
+      "checks": "python3 scripts/check_entities.py",
+      "checks_ok": true,
+      "checks_at": 1792531826803,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531826803,
+          "text": "claude · три справочника читаются вместе: ссылки семейств на элементы и id состояний/применений на семейства целы · проверки зелёные"
+        },
+        {
+          "ts": 1792531825915,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531826803,
+      "spec_rev": "1x7q4y5",
+      "deps": {
+        "input_1f4n": "1hayebd",
+        "input_215i": "1lxs9er",
+        "input_3p83": "1qvawo2"
+      },
+      "spec_at": 1792531826804
+    },
+    "queue_5uw1": {
+      "status": "done",
+      "target": [
+        "agents/README.md",
+        "data/raw/batch1.json",
+        "data/raw/batch2.json",
+        "data/raw/batch3.json",
+        "data/raw/batch4.json",
+        "data/raw/batch5.json",
+        "data/raw/batch6.json",
+        "data/raw_apps/batch1.json",
+        "data/raw_apps/batch2.json",
+        "data/raw_apps/batch3.json",
+        "data/raw_apps/batch4.json",
+        "data/raw_apps/batch5.json",
+        "data/raw_apps/batch6.json"
+      ],
+      "checks": "python3 scripts/check_repro.py",
+      "checks_ok": true,
+      "checks_at": 1792531829802,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531829802,
+          "text": "claude · 6 партий × 2 ветки; партии покрывают ровно 34 семейства · проверки зелёные"
+        },
+        {
+          "ts": 1792531828211,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531829803,
+      "spec_rev": "chsdp1",
+      "deps": {
+        "merge_49y5": "8xch2p"
+      },
+      "spec_at": 1792531829803
+    },
+    "kb_6oab": {
+      "status": "wip",
+      "target": [],
+      "checks": "",
+      "checks_ok": null,
+      "checks_at": 0,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531831302,
+          "text": "claude · источники заданы, но страницы не открывались (сетевая политика облака) — агенты видели только сниппеты поиска; перепроверка по открытым страницам — в «Что доработать»"
+        },
+        {
+          "ts": 1792531830568,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531831302,
+      "spec_rev": "bq6qvi",
+      "deps": {},
+      "spec_at": 1792531831303
+    },
+    "agent_72rw": {
+      "status": "done",
+      "target": [
+        "data/raw/batch1.json",
+        "data/raw/batch2.json",
+        "data/raw/batch3.json",
+        "data/raw/batch4.json",
+        "data/raw/batch5.json",
+        "data/raw/batch6.json",
+        "agents/README.md"
+      ],
+      "checks": "python3 scripts/check_repro.py",
+      "checks_ok": true,
+      "checks_at": 1792531834304,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531834304,
+          "text": "claude · ответы Haiku сохранены как есть в data/raw; итог из них воспроизводится сборкой · проверки зелёные"
+        },
+        {
+          "ts": 1792531832820,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531834304,
+      "spec_rev": "15wpn9a",
+      "deps": {
+        "queue_5uw1": "1qqzplw",
+        "kb_6oab": "17vlfsa"
+      },
+      "spec_at": 1792531834304
+    },
+    "process_857z": {
+      "status": "done",
+      "target": [
+        "scripts/build_states.py"
+      ],
+      "checks": "python3 scripts/check_repro.py\npython3 scripts/check_entities.py",
+      "checks_ok": true,
+      "checks_at": 1792531835802,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531835802,
+          "text": "claude · сборка phase_states из raw с ручными правками; перенесены правки цикла (Al 2519 °C) и разбора (чугун 1147 °C, SiC ≈2730 °C в пути) · проверки зелёные"
+        },
+        {
+          "ts": 1792531835209,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531835803,
+      "spec_rev": "1cshjed",
+      "deps": {
+        "agent_72rw": "1sz6urn"
+      },
+      "spec_at": 1792531835803
+    },
+    "store_9m0l": {
+      "status": "done",
+      "target": [
+        "data/phase_states.json"
+      ],
+      "checks": "python3 scripts/check_entities.py\npython3 scripts/check_repro.py",
+      "checks_ok": true,
+      "checks_at": 1792531838803,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531838803,
+          "text": "claude · 34 строки; загружено на дашборд (датасет states, 2026-10-20 21:40 UTC) · проверки зелёные"
+        },
+        {
+          "ts": 1792531837604,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531838803,
+      "spec_rev": "19alp2s",
+      "deps": {
+        "process_857z": "cifyjg"
+      },
+      "spec_at": 1792531838803
+    },
+    "agent_l5uf": {
+      "status": "done",
+      "target": [
+        "data/raw_apps/batch1.json",
+        "data/raw_apps/batch2.json",
+        "data/raw_apps/batch3.json",
+        "data/raw_apps/batch4.json",
+        "data/raw_apps/batch5.json",
+        "data/raw_apps/batch6.json"
+      ],
+      "checks": "python3 scripts/check_repro.py",
+      "checks_ok": true,
+      "checks_at": 1792531841802,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531841802,
+          "text": "claude · ответы Haiku о применении сохранены как есть в data/raw_apps · проверки зелёные"
+        },
+        {
+          "ts": 1792531839990,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531841802,
+      "spec_rev": "1jggwnn",
+      "deps": {
+        "queue_5uw1": "1qqzplw",
+        "kb_6oab": "17vlfsa"
+      },
+      "spec_at": 1792531841803
+    },
+    "process_mrfm": {
+      "status": "done",
+      "target": [
+        "scripts/build_apps.py"
+      ],
+      "checks": "python3 scripts/check_repro.py\npython3 scripts/check_entities.py",
+      "checks_ok": true,
+      "checks_at": 1792531843304,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531843304,
+          "text": "claude · сборка applications; отрасли только из словаря · проверки зелёные"
+        },
+        {
+          "ts": 1792531842346,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531843304,
+      "spec_rev": "1bpq1op",
+      "deps": {
+        "agent_l5uf": "12mj1jp"
+      },
+      "spec_at": 1792531843304
+    },
+    "store_np3v": {
+      "status": "done",
+      "target": [
+        "data/applications.json"
+      ],
+      "checks": "python3 scripts/check_entities.py\npython3 scripts/check_repro.py",
+      "checks_ok": true,
+      "checks_at": 1792531846303,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531846303,
+          "text": "claude · 34 строки; на дашборде — датасет apps · проверки зелёные"
+        },
+        {
+          "ts": 1792531844769,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531846304,
+      "spec_rev": "1f1hosi",
+      "deps": {
+        "process_mrfm": "1tfdve8"
+      },
+      "spec_at": 1792531846304
+    },
+    "kb_13s90": {
+      "status": "done",
+      "target": [
+        "vendor/pymatgen_periodic_table.json.gz",
+        "vendor/README.md",
+        "requirements.txt"
+      ],
+      "checks": "python3 scripts/recalc.py --max-iter 1 --strict",
+      "checks_ok": true,
+      "checks_at": 1792531859803,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531859803,
+          "text": "claude · обе базы элементов доступны без сети: mendeleev 1.3.0 и таблица pymatgen-core · проверки зелёные"
+        },
+        {
+          "ts": 1792531847183,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531859803,
+      "spec_rev": "hwdv25",
+      "deps": {},
+      "spec_at": 1792531859803
+    },
+    "script_15fad": {
+      "status": "done",
+      "target": [
+        "scripts/recalc.py"
+      ],
+      "checks": "python3 scripts/recalc.py --max-iter 1 --strict",
+      "checks_ok": true,
+      "checks_at": 1792531871803,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531871803,
+          "text": "claude · пересчёт: 259 находок, ok 225, calc 32, info 2, fail 0, warn 0; добавлен --strict и понятная ошибка без mendeleev · проверки зелёные"
+        },
+        {
+          "ts": 1792531860419,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531871803,
+      "spec_rev": "32n641",
+      "deps": {
+        "loop_143lc": "6htptt",
+        "kb_13s90": "17vlfsa"
+      },
+      "spec_at": 1792531871803
+    },
+    "condition_16ony": {
+      "status": "done",
+      "target": [
+        "scripts/recalc.py"
+      ],
+      "checks": "python3 scripts/recalc.py --max-iter 1 --strict",
+      "checks_ok": true,
+      "checks_at": 1792531885304,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531885304,
+          "text": "claude · ошибок без точного ответа нет — ветка «на разбор» сейчас пустая · проверки зелёные"
+        },
+        {
+          "ts": 1792531873129,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531885304,
+      "spec_rev": "1x6yusi",
+      "deps": {
+        "script_15fad": "1cz053o"
+      },
+      "spec_at": 1792531885304
+    },
+    "loop_143lc": {
+      "status": "done",
+      "target": [
+        "scripts/recalc.py"
+      ],
+      "checks": "python3 scripts/recalc.py --apply --max-iter 3 --summary-json --strict",
+      "checks_ok": true,
+      "checks_at": 1792531898805,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531898805,
+          "text": "claude · цикл сходится за 1 проход: исправлять нечего · проверки зелёные"
+        },
+        {
+          "ts": 1792531886601,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531898805,
+      "spec_rev": "h328gr",
+      "deps": {
+        "store_9m0l": "1ayma5i",
+        "condition_16ony": "1o45s8b",
+        "task_17fvh": "h28aup"
+      },
+      "spec_at": 1792531898805
+    },
+    "task_17fvh": {
+      "status": "done",
+      "target": [
+        "scripts/build_states.py",
+        "data/materials.json",
+        "data/checks/recalc_report.md"
+      ],
+      "checks": "python3 scripts/recalc.py --max-iter 1 --strict\npython3 scripts/check_repro.py",
+      "checks_ok": true,
+      "checks_at": 1792531912303,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531912303,
+          "text": "claude · разобраны 3 предупреждения: солидус чугуна 1140 → 1147 °C (эвтектика Fe–C), в пути SiC указано ≈2730 °C, H₃PO₄ в подписи фосфора заменена словами · проверки зелёные"
+        },
+        {
+          "ts": 1792531899860,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531912303,
+      "spec_rev": "14ouhmn",
+      "deps": {
+        "condition_16ony": "1o45s8b"
+      },
+      "spec_at": 1792531912303
+    },
+    "store_1nrat": {
+      "status": "done",
+      "target": [
+        "data/checks/recalc_report.json",
+        "data/checks/recalc_report.md",
+        "data/derived.json"
+      ],
+      "checks": "python3 scripts/recalc.py --max-iter 1 --strict",
+      "checks_ok": true,
+      "checks_at": 1792531924303,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531924303,
+          "text": "claude · отчёт пересчёта и молярные массы 32 формул · проверки зелёные"
+        },
+        {
+          "ts": 1792531913091,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531924303,
+      "spec_rev": "760rjq",
+      "deps": {
+        "loop_143lc": "6htptt"
+      },
+      "spec_at": 1792531924303
+    },
+    "script_1oc6u": {
+      "status": "done",
+      "target": [
+        "scripts/check_entities.py"
+      ],
+      "checks": "python3 scripts/check_entities.py",
+      "checks_ok": true,
+      "checks_at": 1792531927303,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531927303,
+          "text": "claude · 6 сущностей против 6 датасетов; на испорченной копии ловит 4 нарушения из 4 · проверки зелёные"
+        },
+        {
+          "ts": 1792531926056,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531927303,
+      "spec_rev": "dsmi9",
+      "deps": {
+        "store_1nrat": "18zuvj8"
+      },
+      "spec_at": 1792531927303
+    },
+    "sink_19j7m": {
+      "status": "done",
+      "target": [
+        "dashboard/index.html",
+        "dashboard/store/dash/meta.json",
+        "dashboard/store/dash/params.json",
+        "dashboard/store/datasets/apps.json",
+        "dashboard/store/datasets/elements.json",
+        "dashboard/store/datasets/materials.json",
+        "dashboard/store/datasets/scale.json",
+        "dashboard/store/datasets/states.json"
+      ],
+      "checks": "",
+      "checks_ok": null,
+      "checks_at": 0,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531928803,
+          "text": "claude · phase_states.json и materials.json загружены в ассеты дашборда, датасеты states и materials переключены на них; страница дашборда своей проверки (check) не прислала — данные на ней проверены только по файлам"
+        },
+        {
+          "ts": 1792531928338,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531928803,
+      "spec_rev": "gb6wa1",
+      "deps": {
+        "store_np3v": "6tumc9",
+        "script_1oc6u": "r6zxm9"
+      },
+      "spec_at": 1792531928803
+    },
+    "output_11vxp": {
+      "status": "done",
+      "target": [
+        "README.md"
+      ],
+      "checks": "grep -q 6gJVkczyWaovoJUXbKnuzV README.md",
+      "checks_ok": true,
+      "checks_at": 1792531931803,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531931803,
+          "text": "claude · ссылка на дашборд — в README и в блоке «Дашборд» · проверки зелёные"
+        },
+        {
+          "ts": 1792531930612,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531931803,
+      "spec_rev": "jsgkt2",
+      "deps": {
+        "sink_19j7m": "xbcj03"
+      },
+      "spec_at": 1792531931803
+    },
+    "entity_t8ij": {
+      "status": "done",
+      "target": [
+        "scripts/check_entities.py"
+      ],
+      "checks": "python3 scripts/check_entities.py",
+      "checks_ok": true,
+      "checks_at": 1792531934807,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531934807,
+          "text": "claude · датасет соответствует сущности: поля, типы, списки значений, ссылки · проверки зелёные"
+        },
+        {
+          "ts": 1792531932865,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531934807,
+      "spec_rev": "1uk79kg",
+      "deps": {},
+      "spec_at": 1792531934807
+    },
+    "entity_u1nr": {
+      "status": "done",
+      "target": [
+        "scripts/check_entities.py"
+      ],
+      "checks": "python3 scripts/check_entities.py",
+      "checks_ok": true,
+      "checks_at": 1792531936303,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531936303,
+          "text": "claude · датасет соответствует сущности: поля, типы, списки значений, ссылки · проверки зелёные"
+        },
+        {
+          "ts": 1792531935149,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531936304,
+      "spec_rev": "ixirrq",
+      "deps": {},
+      "spec_at": 1792531936304
+    },
+    "entity_v8da": {
+      "status": "done",
+      "target": [
+        "scripts/check_entities.py"
+      ],
+      "checks": "python3 scripts/check_entities.py",
+      "checks_ok": true,
+      "checks_at": 1792531939304,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531939304,
+          "text": "claude · датасет соответствует сущности: поля, типы, списки значений, ссылки · проверки зелёные"
+        },
+        {
+          "ts": 1792531937442,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531939304,
+      "spec_rev": "1duwt5z",
+      "deps": {},
+      "spec_at": 1792531939304
+    },
+    "entity_w1rd": {
+      "status": "done",
+      "target": [
+        "scripts/check_entities.py"
+      ],
+      "checks": "python3 scripts/check_entities.py",
+      "checks_ok": true,
+      "checks_at": 1792531940803,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531940803,
+          "text": "claude · датасет соответствует сущности: поля, типы, списки значений, ссылки · проверки зелёные"
+        },
+        {
+          "ts": 1792531939730,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531940803,
+      "spec_rev": "j9rsmf",
+      "deps": {},
+      "spec_at": 1792531940803
+    },
+    "entity_xzwz": {
+      "status": "done",
+      "target": [
+        "scripts/check_entities.py"
+      ],
+      "checks": "python3 scripts/check_entities.py",
+      "checks_ok": true,
+      "checks_at": 1792531943802,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531943802,
+          "text": "claude · датасет соответствует сущности: поля, типы, списки значений, ссылки · проверки зелёные"
+        },
+        {
+          "ts": 1792531942013,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531943802,
+      "spec_rev": "vn5ips",
+      "deps": {},
+      "spec_at": 1792531943802
+    },
+    "entity_1a7v1": {
+      "status": "done",
+      "target": [
+        "scripts/check_entities.py"
+      ],
+      "checks": "python3 scripts/check_entities.py",
+      "checks_ok": true,
+      "checks_at": 1792531945302,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531945302,
+          "text": "claude · датасет соответствует сущности: поля, типы, списки значений, ссылки · проверки зелёные"
+        },
+        {
+          "ts": 1792531944297,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531945302,
+      "spec_rev": "1tinxwt",
+      "deps": {},
+      "spec_at": 1792531945302
+    },
+    "decision_yv9w": {
+      "status": "done",
+      "target": [
+        "data/phase_states.json",
+        "data/applications.json"
+      ],
+      "checks": "python3 scripts/check_entities.py",
+      "checks_ok": true,
+      "checks_at": 1792531948303,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531948303,
+          "text": "claude · метка conf обязательна и из списка — проверяет словарь данных · проверки зелёные"
+        },
+        {
+          "ts": 1792531946586,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531948303,
+      "spec_rev": "1umx4u9",
+      "deps": {},
+      "spec_at": 1792531948303
+    },
+    "decision_z0tu": {
+      "status": "done",
+      "target": [
+        "scripts/build_apps.py"
+      ],
+      "checks": "python3 scripts/check_entities.py",
+      "checks_ok": true,
+      "checks_at": 1792531949802,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531949802,
+          "text": "claude · отрасли вне словаря ловит и сборка, и проверка словаря · проверки зелёные"
+        },
+        {
+          "ts": 1792531948875,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531949802,
+      "spec_rev": "5ebt4",
+      "deps": {},
+      "spec_at": 1792531949802
+    },
+    "decision_10u94": {
+      "status": "done",
+      "target": [
+        "scripts/build_states.py"
+      ],
+      "checks": "python3 -c \"import json,sys; sys.exit(any((r['boil_C'] or 0) > 5000 for r in json.load(open('data/phase_states.json'))))\"",
+      "checks_ok": true,
+      "checks_at": 1792531952803,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531952803,
+          "text": "claude · ни одного boil_C > 5000 °C на шкале; WC ≈6000 °C — только в тексте · проверки зелёные"
+        },
+        {
+          "ts": 1792531951158,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531952803,
+      "spec_rev": "jkiyir",
+      "deps": {},
+      "spec_at": 1792531952803
+    },
+    "decision_1bgnf": {
+      "status": "done",
+      "target": [
+        "scripts/recalc.py"
+      ],
+      "checks": "python3 scripts/recalc.py --max-iter 1 --strict",
+      "checks_ok": true,
+      "checks_at": 1792531964803,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531964803,
+          "text": "claude · цикл правит только вычислимое; спорное ушло в «Разбор расхождений» · проверки зелёные"
+        },
+        {
+          "ts": 1792531953448,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531964803,
+      "spec_rev": "18mtwoj",
+      "deps": {},
+      "spec_at": 1792531964803
+    },
+    "decision_1qhjo": {
+      "status": "done",
+      "target": [
+        "scripts/build_states.py",
+        "scripts/check_repro.py"
+      ],
+      "checks": "python3 scripts/check_repro.py",
+      "checks_ok": true,
+      "checks_at": 1792531967803,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531967803,
+          "text": "claude · все правки в build_*.py; check_repro.py ловит правку мимо сборки · проверки зелёные"
+        },
+        {
+          "ts": 1792531966051,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531967803,
+      "spec_rev": "1ylki2p",
+      "deps": {},
+      "spec_at": 1792531967803
+    },
+    "decision_1vpiw": {
+      "status": "done",
+      "target": [],
+      "checks": "",
+      "checks_ok": null,
+      "checks_at": 0,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531969303,
+          "text": "claude · принято: пакетный локальный прогон без брокера; пересмотреть при запуске по расписанию"
+        },
+        {
+          "ts": 1792531968416,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531969303,
+      "spec_rev": "qafuko",
+      "deps": {},
+      "spec_at": 1792531969303
+    },
+    "unit_1u492": {
+      "status": "done",
+      "target": [
+        ".bench-project.json",
+        "requirements.txt",
+        "README.md"
+      ],
+      "checks": "python3 scripts/check_entities.py\npython3 scripts/check_repro.py\npython3 scripts/recalc.py --max-iter 1 --strict",
+      "checks_ok": true,
+      "checks_at": 1792531982803,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531982803,
+          "text": "claude · контур — рабочая папка; проверка живости = три проверки проекта · проверки зелёные"
+        },
+        {
+          "ts": 1792531970667,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531982803,
+      "spec_rev": "y4xrrs",
+      "deps": {},
+      "spec_at": 1792531982803
+    },
+    "monitor_1wi2q": {
+      "status": "done",
+      "target": [
+        "data/checks/recalc_report.json"
+      ],
+      "checks": "test -s data/checks/recalc_report.json",
+      "checks_ok": true,
+      "checks_at": 1792531984303,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792531984303,
+          "text": "claude · журнал проверок — data/checks/ и история git · проверки зелёные"
+        },
+        {
+          "ts": 1792531983137,
+          "text": "выдал задание"
+        }
+      ],
+      "updatedAt": 1792531984303,
+      "spec_rev": "mt05eg",
+      "deps": {},
+      "spec_at": 1792531984303
+    }
+  }
+}

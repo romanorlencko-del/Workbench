@@ -1,0 +1,402 @@
+{
+  "v": 1,
+  "projectId": "p_mvdvf9i22ss",
+  "updatedAt": 1792530605791,
+  "root": "",
+  "nodes": {
+    "start_13cw": {
+      "status": "done",
+      "target": [],
+      "checks": "",
+      "checks_ok": null,
+      "checks_at": 0,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792530605571,
+          "text": "claude · Расписание: 25 июня и 25 декабря, после отчётов USDA."
+        }
+      ],
+      "updatedAt": 1792530605571,
+      "spec_rev": "1crgqhm",
+      "deps": {},
+      "spec_at": 1792530605571
+    },
+    "input_21nv": {
+      "status": "done",
+      "target": [
+        "coffee-belt/page.src.html"
+      ],
+      "checks": "",
+      "checks_ok": null,
+      "checks_at": 0,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792530605580,
+          "text": "claude · Объёмы 2026/27 и ряды 2021/22–2025/26 перенесены в массив R (поле hist)."
+        }
+      ],
+      "updatedAt": 1792530605580,
+      "spec_rev": "pljpfz",
+      "deps": {
+        "start_13cw": "6thays"
+      },
+      "spec_at": 1792530605580
+    },
+    "input_3zr6": {
+      "status": "done",
+      "target": [
+        "coffee-belt/page.src.html"
+      ],
+      "checks": "",
+      "checks_ok": null,
+      "checks_at": 0,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792530605594,
+          "text": "claude · Цифры атташе по 11 странам сверены и внесены в поле check."
+        }
+      ],
+      "updatedAt": 1792530605594,
+      "spec_rev": "1u8gswq",
+      "deps": {
+        "start_13cw": "6thays"
+      },
+      "spec_at": 1792530605594
+    },
+    "input_42ta": {
+      "status": "done",
+      "target": [
+        "coffee-belt/page.src.html"
+      ],
+      "checks": "",
+      "checks_ok": null,
+      "checks_at": 0,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792530605611,
+          "text": "claude · Мир 2025/26: 183,6 млн мешков — в сноске и на обложке отчёта."
+        }
+      ],
+      "updatedAt": 1792530605611,
+      "spec_rev": "15cd9zi",
+      "deps": {
+        "start_13cw": "6thays"
+      },
+      "spec_at": 1792530605611
+    },
+    "input_5mwf": {
+      "status": "done",
+      "target": [
+        "coffee-belt/page.src.html"
+      ],
+      "checks": "",
+      "checks_ok": null,
+      "checks_at": 0,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792530605625,
+          "text": "claude · CONAB 67,6 млн (сент. 2026), FNC 12,65 млн за 2025/26 (окт. 2026)."
+        }
+      ],
+      "updatedAt": 1792530605625,
+      "spec_rev": "1vqn6hl",
+      "deps": {
+        "start_13cw": "6thays"
+      },
+      "spec_at": 1792530605625
+    },
+    "merge_6az3": {
+      "status": "done",
+      "target": [
+        "coffee-belt/page.src.html"
+      ],
+      "checks": "",
+      "checks_ok": null,
+      "checks_at": 0,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792530605639,
+          "text": "claude · Источники сведены в один набор."
+        }
+      ],
+      "updatedAt": 1792530605640,
+      "spec_rev": "10v882g",
+      "deps": {
+        "input_21nv": "1hxomri",
+        "input_3zr6": "bozonp",
+        "input_42ta": "1wqdmjr",
+        "input_5mwf": "6ya0ys"
+      },
+      "spec_at": 1792530605640
+    },
+    "process_7s0p": {
+      "status": "done",
+      "target": [
+        "coffee-belt/page.src.html",
+        "coffee-belt/data/coffee-countries.csv"
+      ],
+      "checks": "",
+      "checks_ok": null,
+      "checks_at": 0,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792530605657,
+          "text": "claude · 12 стран, поля vol/ara/rob/mix/alt/cal/varieties."
+        }
+      ],
+      "updatedAt": 1792530605657,
+      "spec_rev": "r95v8w",
+      "deps": {
+        "merge_6az3": "8xch2p",
+        "kb_aioh": "17vlfsa"
+      },
+      "spec_at": 1792530605657
+    },
+    "process_89e3": {
+      "status": "done",
+      "target": [
+        "coffee-belt/page.src.html"
+      ],
+      "checks": "",
+      "checks_ok": null,
+      "checks_at": 0,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792530605673,
+          "text": "claude · Расхождения записаны в поле check каждой страны."
+        }
+      ],
+      "updatedAt": 1792530605673,
+      "spec_rev": "1h6zffi",
+      "deps": {
+        "process_7s0p": "6obznd"
+      },
+      "spec_at": 1792530605673
+    },
+    "process_99hw": {
+      "status": "done",
+      "target": [
+        "coffee-belt/page.src.html",
+        "coffee-belt/data/coffee-dynamics-2021-2027.csv"
+      ],
+      "checks": "",
+      "checks_ok": null,
+      "checks_at": 0,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792530605689,
+          "text": "claude · Ряды по 6 сезонам + сумма 12 стран."
+        }
+      ],
+      "updatedAt": 1792530605689,
+      "spec_rev": "2mzui0",
+      "deps": {
+        "process_89e3": "199u3bi"
+      },
+      "spec_at": 1792530605689
+    },
+    "kb_aioh": {
+      "status": "done",
+      "target": [
+        "coffee-belt/page.src.html"
+      ],
+      "checks": "",
+      "checks_ok": null,
+      "checks_at": 0,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792530605706,
+          "text": "claude · Экспертные оценки: обработка, высоты, сорта, профиль, календарь."
+        }
+      ],
+      "updatedAt": 1792530605706,
+      "spec_rev": "1ihfbiy",
+      "deps": {},
+      "spec_at": 1792530605706
+    },
+    "kb_bqyh": {
+      "status": "done",
+      "target": [
+        "coffee-belt/countries-110m.json"
+      ],
+      "checks": "",
+      "checks_ok": null,
+      "checks_at": 0,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792530605722,
+          "text": "claude · world-atlas 2.0.2, без Антарктиды."
+        }
+      ],
+      "updatedAt": 1792530605723,
+      "spec_rev": "ky5nsn",
+      "deps": {},
+      "spec_at": 1792530605723
+    },
+    "script_cv4y": {
+      "status": "done",
+      "target": [
+        "coffee-belt/build.py",
+        "coffee-belt/prerender.cjs",
+        "coffee-belt/vendor/d3.min.js",
+        "coffee-belt/vendor/topojson.min.js",
+        "coffee-belt.html"
+      ],
+      "checks": "cd coffee-belt && python3 build.py && node prerender.cjs",
+      "checks_ok": null,
+      "checks_at": 0,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792530605745,
+          "text": "claude · Страница собирается офлайн и видна без JavaScript."
+        }
+      ],
+      "updatedAt": 1792530605745,
+      "spec_rev": "pp19b5",
+      "deps": {
+        "process_99hw": "1moen26",
+        "kb_bqyh": "17vlfsa"
+      },
+      "spec_at": 1792530605745
+    },
+    "sink_dikt": {
+      "status": "done",
+      "target": [],
+      "checks": "",
+      "checks_ok": null,
+      "checks_at": 0,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792530605761,
+          "text": "claude · Опубликовано: https://claude.ai/artifact/WrTiVrA15bFr5XjshptF7S"
+        }
+      ],
+      "updatedAt": 1792530605761,
+      "spec_rev": "jjjyy8",
+      "deps": {
+        "script_cv4y": "gzcr53"
+      },
+      "spec_at": 1792530605761
+    },
+    "output_ekog": {
+      "status": "done",
+      "target": [
+        "coffee-belt.html"
+      ],
+      "checks": "",
+      "checks_ok": null,
+      "checks_at": 0,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792530605768,
+          "text": "claude · Один файл ~680 КБ, работает офлайн."
+        }
+      ],
+      "updatedAt": 1792530605768,
+      "spec_rev": "1fpi82b",
+      "deps": {
+        "sink_dikt": "1i1ijfg"
+      },
+      "spec_at": 1792530605768
+    },
+    "script_wduv": {
+      "status": "done",
+      "target": [
+        "coffee-belt/report.cjs",
+        "coffee-belt/attach.py"
+      ],
+      "checks": "cd coffee-belt && node report.cjs && python3 attach.py",
+      "checks_ok": null,
+      "checks_at": 0,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792530605775,
+          "text": "claude · 10 листов A4, вложены 2 CSV и JSON."
+        }
+      ],
+      "updatedAt": 1792530605775,
+      "spec_rev": "7jcp7d",
+      "deps": {
+        "script_cv4y": "gzcr53",
+        "kb_ym0w": "17vlfsa"
+      },
+      "spec_at": 1792530605775
+    },
+    "output_x1by": {
+      "status": "done",
+      "target": [
+        "coffee-belt-report.pdf"
+      ],
+      "checks": "",
+      "checks_ok": null,
+      "checks_at": 0,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792530605783,
+          "text": "claude · PDF ~960 КБ, метаданные и вложения на месте."
+        }
+      ],
+      "updatedAt": 1792530605783,
+      "spec_rev": "19fkg25",
+      "deps": {
+        "script_wduv": "o7fonm"
+      },
+      "spec_at": 1792530605783
+    },
+    "kb_ym0w": {
+      "status": "done",
+      "target": [
+        "coffee-belt/data/coffee-countries.csv",
+        "coffee-belt/data/coffee-dynamics-2021-2027.csv",
+        "coffee-belt/data/coffee-data.json"
+      ],
+      "checks": "",
+      "checks_ok": null,
+      "checks_at": 0,
+      "checks_out": "",
+      "owner": "claude",
+      "log": [
+        {
+          "ts": 1792530605791,
+          "text": "claude · Таблицы данных отдельными файлами; цифры также в заметке блока."
+        }
+      ],
+      "updatedAt": 1792530605791,
+      "spec_rev": "1bsig3e",
+      "deps": {},
+      "spec_at": 1792530605791
+    }
+  }
+}

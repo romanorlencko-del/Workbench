@@ -3,6 +3,7 @@
 
 Берёт build/report-raw.pdf и build/data.json (их делает report.cjs) и добавляет
 в PDF файлы-вложения: две таблицы CSV (открываются в Excel) и полный JSON.
+Те же таблицы сохраняет отдельными файлами в data/.
 """
 import csv
 import io
@@ -51,15 +52,25 @@ def main():
         + [["Сумма 12 стран", ""] + [dec(round(sum(r["hist"][i] for r in data), 3)) for i in range(6)]
            + ["2026/27 — прогноз USDA"]])
 
+    files = {
+        "coffee-countries.csv": countries,
+        "coffee-dynamics-2021-2027.csv": dynamics,
+        "coffee-data.json": json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"),
+    }
+    # те же таблицы — рядом отдельными файлами, чтобы данные жили и без PDF
+    os.makedirs(os.path.join(HERE, "data"), exist_ok=True)
+    for name, blob in files.items():
+        with open(os.path.join(HERE, "data", name), "wb") as f:
+            f.write(blob)
+
     writer = PdfWriter(clone_from=PdfReader(os.path.join(BUILD, "report-raw.pdf")))
     writer.add_metadata({
         "/Title": "Кофейный пояс Земли — выращивание и производство кофе",
         "/Subject": "12 крупнейших стран, сезон 2026/27, динамика 2021/22–2026/27 (USDA, ICO, CONAB, FNC)",
         "/Keywords": "кофе, арабика, робуста, USDA, ICO, урожай",
     })
-    writer.add_attachment("coffee-countries.csv", countries)
-    writer.add_attachment("coffee-dynamics-2021-2027.csv", dynamics)
-    writer.add_attachment("coffee-data.json", json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"))
+    for name, blob in files.items():
+        writer.add_attachment(name, blob)
     writer.page_mode = "/UseAttachments"  # просмотрщик сразу покажет панель вложений
     with open(os.path.join(HERE, "..", "coffee-belt-report.pdf"), "wb") as f:
         writer.write(f)

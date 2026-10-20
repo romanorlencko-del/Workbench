@@ -28,7 +28,7 @@
         "max_output_tokens": 32768
       }
     },
-    "rev": 1
+    "rev": 2
   },
   "nodes": [
     {
@@ -70,7 +70,7 @@
       "type": "input",
       "name": "Семейства материалов",
       "x": 40,
-      "y": 170,
+      "y": 263,
       "enabled": true,
       "params": {
         "kind": "file",
@@ -110,7 +110,7 @@
       "type": "input",
       "name": "Масштаб мира веществ",
       "x": 40,
-      "y": 300,
+      "y": 486,
       "enabled": true,
       "params": {
         "kind": "file",
@@ -145,7 +145,7 @@
       "type": "merge",
       "name": "Сводка входов",
       "x": 350,
-      "y": 170,
+      "y": 309,
       "enabled": true,
       "params": {
         "strategy": "all",
@@ -159,7 +159,7 @@
       "type": "queue",
       "name": "Партии по 5–6 семейств",
       "x": 660,
-      "y": 170,
+      "y": 283,
       "enabled": true,
       "params": {
         "mode": "parallel",
@@ -183,7 +183,7 @@
       "type": "kb",
       "name": "Справочные источники",
       "x": 660,
-      "y": 352,
+      "y": 519,
       "enabled": true,
       "params": {
         "kind": "url",
@@ -202,7 +202,7 @@
       "type": "agent",
       "name": "Агенты Haiku: агрегатные состояния",
       "x": 970,
-      "y": 170,
+      "y": 283,
       "enabled": true,
       "params": {
         "provider": "anthropic",
@@ -242,7 +242,7 @@
       "type": "process",
       "name": "Сверка и заполнение пробелов",
       "x": 1280,
-      "y": 170,
+      "y": 275,
       "enabled": true,
       "params": {
         "op": "clean",
@@ -290,7 +290,7 @@
       "type": "store",
       "name": "Датасет phase_states",
       "x": 1590,
-      "y": 170,
+      "y": 284,
       "enabled": true,
       "params": {
         "writes": [
@@ -324,7 +324,7 @@
       "type": "sink",
       "name": "Дашборд «Карта материалов»",
       "x": 1900,
-      "y": 170,
+      "y": 384,
       "enabled": true,
       "params": {
         "channel": "dashboard",
@@ -360,12 +360,131 @@
       "type": "note",
       "name": "Что доработать",
       "x": 40,
-      "y": -101,
+      "y": -60,
       "enabled": true,
       "params": {
-        "text": "1) Открыть справочные домены и перепроверить все 34 строки по открытым страницам.\n2) Подтвердить: ВЭС (сплав Кантора), NiTi, SmCo5, PZT, LaMnO3, 7075, 430, Waspaloy, CMSX-4, периклаз.\n3) Агрегатные состояния для самих элементов (справочник элементов).\n4) Заменить метки «по памяти» на ссылки."
+        "text": "1) Открыть справочные домены и перепроверить все 34 строки по открытым страницам.\n2) Подтвердить: ВЭС (сплав Кантора), NiTi, SmCo5, PZT, LaMnO3, 7075, 430, Waspaloy, CMSX-4, периклаз.\n3) Применение: сверить марки и ГОСТы с действующими редакциями (ГОСТ 28818, 9808, 4543, 1412, 7293, 19807).\n4) Агрегатные состояния и применение для самих элементов.\n5) Заменить метки «по памяти» на ссылки."
       },
       "notes": ""
+    },
+    {
+      "id": "agent_l5uf",
+      "type": "agent",
+      "name": "Агенты Haiku: применение и названия",
+      "x": 970,
+      "y": 467,
+      "enabled": true,
+      "params": {
+        "provider": "anthropic",
+        "base_url": "https://api.anthropic.com/v1",
+        "api_key_env": "ANTHROPIC_API_KEY",
+        "model_ref": "primary",
+        "temperature": 0,
+        "max_tokens": 4096,
+        "graph_in": false,
+        "output_var": "ctx.apps_raw",
+        "on_error": "continue",
+        "retry": 2,
+        "backoff": "exponential",
+        "backoff_s": 1,
+        "backoff_max_s": 30,
+        "jitter": true,
+        "timeout_s": 180,
+        "stream": false,
+        "breaker": "off",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "error",
+        "model": "claude-haiku-5-5",
+        "prompt": "Для каждого семейства партии: tech_name и tech_name_en (техническое название и ключевые формы), designations (ГОСТ, EN, ISO, AISI, марки), industries (2–6 отраслей из фиксированного списка, главная первой), applications (3–5 конкретных применений), note, conf (сниппет поиска | по памяти), source. Результат — JSON-массив в apps/batchN.json.",
+        "tools": [
+          "web_search",
+          "write_file"
+        ]
+      },
+      "notes": "По агенту на партию (те же 6 партий). Отрасли — только из фиксированного списка (VOCAB в scripts/build_apps.py)."
+    },
+    {
+      "id": "process_mrfm",
+      "type": "process",
+      "name": "Сверка: применение",
+      "x": 1280,
+      "y": 528,
+      "enabled": true,
+      "params": {
+        "op": "clean",
+        "on_error": "fail",
+        "retry": 0,
+        "backoff": "exponential",
+        "backoff_s": 1,
+        "backoff_max_s": 30,
+        "jitter": true,
+        "idem_store": "db_unique",
+        "idem_window_h": 24,
+        "breaker": "off",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "error",
+        "publish_mode": "none",
+        "outbox_table": "outbox",
+        "relay": "worker",
+        "relay_interval_s": 1,
+        "outbox_keep_h": 24,
+        "peak_factor": 1,
+        "input_var": "ctx.apps_raw",
+        "output_var": "ctx.apps",
+        "rule": "Отрасль вне словаря — ошибка сборки. Исправленная вручную строка получает conf = «по памяти».",
+        "fields": [
+          "id",
+          "tech_name",
+          "tech_name_en",
+          "designations",
+          "industries",
+          "applications",
+          "note",
+          "conf",
+          "source"
+        ]
+      },
+      "notes": "scripts/build_apps.py: проверка отраслей по словарю, ручные правки (ГОСТ 4404 у углерода, отрасли цемента и Al–SiC, ПОИ у припоев)."
+    },
+    {
+      "id": "store_np3v",
+      "type": "store",
+      "name": "Датасет applications",
+      "x": 1590,
+      "y": 528,
+      "enabled": true,
+      "params": {
+        "writes": [
+          "находки"
+        ],
+        "dataset": "applications",
+        "anonymize": true,
+        "target": "sqlite",
+        "uri": "workspace/Карта-материалов-от-элементов-к-сплавам/data/applications.json",
+        "keep": "forever",
+        "keep_days": 365,
+        "dedupe_key": "id",
+        "versioning": true,
+        "redact_secrets": true,
+        "store_snippets": false,
+        "output_var": "ctx.run_id",
+        "idem_store": "db_unique",
+        "idem_window_h": 24,
+        "publish_mode": "none",
+        "outbox_table": "outbox",
+        "relay": "worker",
+        "relay_interval_s": 1,
+        "outbox_keep_h": 24,
+        "peak_factor": 1,
+        "env_over": []
+      },
+      "notes": "Локально: data/applications.json. На дашборде — датасет apps (матрица «семейство × отрасль», фильтр по отрасли, колонки таблицы)."
     }
   ],
   "edges": [
@@ -476,7 +595,67 @@
         "port": "in"
       },
       "kind": "flow"
+    },
+    {
+      "id": "e_o384",
+      "from": {
+        "node": "queue_5uw1",
+        "port": "out"
+      },
+      "to": {
+        "node": "agent_l5uf",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_pf9b",
+      "from": {
+        "node": "kb_6oab",
+        "port": "data"
+      },
+      "to": {
+        "node": "agent_l5uf",
+        "port": "kb"
+      },
+      "kind": "data"
+    },
+    {
+      "id": "e_qmgx",
+      "from": {
+        "node": "agent_l5uf",
+        "port": "out"
+      },
+      "to": {
+        "node": "process_mrfm",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_ruf4",
+      "from": {
+        "node": "process_mrfm",
+        "port": "out"
+      },
+      "to": {
+        "node": "store_np3v",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_s2by",
+      "from": {
+        "node": "store_np3v",
+        "port": "out"
+      },
+      "to": {
+        "node": "sink_alxw",
+        "port": "in"
+      },
+      "kind": "flow"
     }
   ],
-  "seq": 21
+  "seq": 29
 }

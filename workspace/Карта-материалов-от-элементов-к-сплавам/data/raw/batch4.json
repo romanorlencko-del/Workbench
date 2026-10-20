@@ -1,0 +1,80 @@
+[
+  {
+    "id": "stainless",
+    "state_25C": "твёрдое",
+    "melt_low_C": 1375,
+    "melt_high_C": 1455,
+    "boil_C": 2862,
+    "decomp_C": null,
+    "liquid_exists": true,
+    "heating_path": "твёрдое (аустенит/феррит) → двухфазная зона (≈1375–1455 °C) → жидкое → газ (≈2862 °C, основа Fe)",
+    "note": "Солидус 1375 (316/316L) и ликвидус 1455 (304/304L) по сводке MW Alloys; марка 430 не найдена, страница не открыта, точка кипения Fe не сверена.",
+    "conf": "оценка",
+    "source": "https://www.mwalloys.com/it/melting-point-of-stainless-steel-what-it-means-for-manufacturing/"
+  },
+  {
+    "id": "castiron",
+    "state_25C": "твёрдое",
+    "melt_low_C": 1140,
+    "melt_high_C": 1149,
+    "boil_C": 2862,
+    "decomp_C": null,
+    "liquid_exists": true,
+    "heating_path": "твёрдое → эвтектика (≈1140 °C) → двухфазная зона → жидкое (ликвидус до ≈1149 °C для высокоуглеродистых составов) → газ (≈2862 °C, основа Fe)",
+    "note": "Эвтектика 1140 и ликвидус 1149 получены из патентных выдержек для высокоуглеродистого ковкого/ductile чугуна; интервал ликвидуса 1250–1300 °C из ТЗ не подтверждён, страница не открыта, источник приблизительный.",
+    "conf": "оценка",
+    "source": "https://www.jstage.jst.go.jp/article/imono/51/8/51_457/_article"
+  },
+  {
+    "id": "al_wr",
+    "state_25C": "твёрдое",
+    "melt_low_C": 502,
+    "melt_high_C": 657,
+    "boil_C": 2470,
+    "decomp_C": null,
+    "liquid_exists": true,
+    "heating_path": "твёрдое → двухфазная зона (≈502–657 °C; солидус 2024 ≈502 °C, 1100 ≈643 °C) → жидкое → газ (≈2470 °C, основа Al)",
+    "note": "Диапазон по 2024 (≈502–638 °C) и 1100 (≈643–657 °C) из форумной выдержки с пересчётом старого справочника Alcoa из °F; 6061 (582/652 по MatWeb) согласуется; 7075 не найден, страница не открыта.",
+    "conf": "оценка",
+    "source": "https://www.eng-tips.com/viewthread.cfm?qid=34283"
+  },
+  {
+    "id": "cu_al",
+    "state_25C": "твёрдое",
+    "melt_low_C": 900,
+    "melt_high_C": 1238,
+    "boil_C": 2562,
+    "decomp_C": 907,
+    "liquid_exists": true,
+    "heating_path": "твёрдое → двухфазная зона (≈900–1238 °C; около 907 °C возможна возгонка Zn из латуней) → жидкое → газ (≈2562 °C, основа Cu)",
+    "note": "Нижняя граница 900 (латунь C26800) взята у MakeItFrom, не у CDA; верхняя 1238 (купроникель C71500, ликвидус 2260 °F) по карточке CDA; бронзы и мельхиоры не сверены, страница не открыта.",
+    "conf": "оценка",
+    "source": "https://alloys.copper.org/alloy/C71500"
+  },
+  {
+    "id": "ti_al",
+    "state_25C": "твёрдое",
+    "melt_low_C": 1604,
+    "melt_high_C": 1660,
+    "boil_C": 3287,
+    "decomp_C": null,
+    "liquid_exists": true,
+    "heating_path": "твёрдое (α+β) → β-transus ≈980 °C → β → двухфазная зона (≈1604–1660 °C) → жидкое → газ (≈3287 °C, основа Ti)",
+    "note": "Солидус 1604, ликвидус 1660 и β-transus 980 для Ti-6Al-4V по листу Kyocera; вариант ELI и другие марки не найдены, по другим источникам transus 966–999 °C, страница не открыта.",
+    "conf": "оценка",
+    "source": "https://kyocera-sgstool.co.uk/titanium-resources/titanium-information-everything-you-need-to-know/ti-6al-4v-grade-5-titanium-alloy-data-sheet/"
+  },
+  {
+    "id": "ni_super",
+    "state_25C": "твёрдое",
+    "melt_low_C": 1260,
+    "melt_high_C": 1350,
+    "boil_C": 2913,
+    "decomp_C": null,
+    "liquid_exists": true,
+    "heating_path": "твёрдое (γ/γ′) → двухфазная зона (≈1260–1350 °C, зависит от марки) → жидкое → газ (≈2913 °C, основа Ni)",
+    "note": "Inconel 718 (солидус 1260, ликвидус 1336) по сводке mwalloys и Inconel 625 (1290–1350) по бюллетеню Special Metals; Waspaloy и CMSX-4 не найдены, страницы не открыты.",
+    "conf": "оценка",
+    "source": "https://www.specialmetals.com/documents/technical-bulletins/inconel/inconel-alloy-625.pdf"
+  }
+]

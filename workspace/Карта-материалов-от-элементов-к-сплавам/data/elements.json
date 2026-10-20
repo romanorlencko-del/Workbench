@@ -1,0 +1,197 @@
+[
+{
+"symbol": "C",
+"name_ru": "Углерод",
+"kind": "неметалл"
+},
+{
+"symbol": "Fe",
+"name_ru": "Железо",
+"kind": "металл"
+},
+{
+"symbol": "Si",
+"name_ru": "Кремний",
+"kind": "полуметалл"
+},
+{
+"symbol": "P",
+"name_ru": "Фосфор",
+"kind": "неметалл"
+},
+{
+"symbol": "Sn",
+"name_ru": "Олово",
+"kind": "металл"
+},
+{
+"symbol": "O",
+"name_ru": "Кислород",
+"kind": "неметалл"
+},
+{
+"symbol": "H",
+"name_ru": "Водород",
+"kind": "неметалл"
+},
+{
+"symbol": "Al",
+"name_ru": "Алюминий",
+"kind": "металл"
+},
+{
+"symbol": "Ti",
+"name_ru": "Титан",
+"kind": "металл"
+},
+{
+"symbol": "N",
+"name_ru": "Азот",
+"kind": "неметалл"
+},
+{
+"symbol": "W",
+"name_ru": "Вольфрам",
+"kind": "металл"
+},
+{
+"symbol": "B",
+"name_ru": "Бор",
+"kind": "полуметалл"
+},
+{
+"symbol": "Ba",
+"name_ru": "Барий",
+"kind": "металл"
+},
+{
+"symbol": "Pb",
+"name_ru": "Свинец",
+"kind": "металл"
+},
+{
+"symbol": "Zr",
+"name_ru": "Цирконий",
+"kind": "металл"
+},
+{
+"symbol": "Sr",
+"name_ru": "Стронций",
+"kind": "металл"
+},
+{
+"symbol": "La",
+"name_ru": "Лантан",
+"kind": "металл"
+},
+{
+"symbol": "Na",
+"name_ru": "Натрий",
+"kind": "металл"
+},
+{
+"symbol": "Zn",
+"name_ru": "Цинк",
+"kind": "металл"
+},
+{
+"symbol": "Cu",
+"name_ru": "Медь",
+"kind": "металл"
+},
+{
+"symbol": "Ca",
+"name_ru": "Кальций",
+"kind": "металл"
+},
+{
+"symbol": "Mg",
+"name_ru": "Магний",
+"kind": "металл"
+},
+{
+"symbol": "K",
+"name_ru": "Калий",
+"kind": "металл"
+},
+{
+"symbol": "Mn",
+"name_ru": "Марганец",
+"kind": "металл"
+},
+{
+"symbol": "Cr",
+"name_ru": "Хром",
+"kind": "металл"
+},
+{
+"symbol": "Ni",
+"name_ru": "Никель",
+"kind": "металл"
+},
+{
+"symbol": "Mo",
+"name_ru": "Молибден",
+"kind": "металл"
+},
+{
+"symbol": "V",
+"name_ru": "Ванадий",
+"kind": "металл"
+},
+{
+"symbol": "Co",
+"name_ru": "Кобальт",
+"kind": "металл"
+},
+{
+"symbol": "Nb",
+"name_ru": "Ниобий",
+"kind": "металл"
+},
+{
+"symbol": "Li",
+"name_ru": "Литий",
+"kind": "металл"
+},
+{
+"symbol": "Be",
+"name_ru": "Бериллий",
+"kind": "металл"
+},
+{
+"symbol": "Y",
+"name_ru": "Иттрий",
+"kind": "металл"
+},
+{
+"symbol": "Nd",
+"name_ru": "Неодим",
+"kind": "металл"
+},
+{
+"symbol": "Ag",
+"name_ru": "Серебро",
+"kind": "металл"
+},
+{
+"symbol": "Bi",
+"name_ru": "Висмут",
+"kind": "металл"
+},
+{
+"symbol": "Ta",
+"name_ru": "Тантал",
+"kind": "металл"
+},
+{
+"symbol": "Re",
+"name_ru": "Рений",
+"kind": "металл"
+},
+{
+"symbol": "Sm",
+"name_ru": "Самарий",
+"kind": "металл"
+}
+]

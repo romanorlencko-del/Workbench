@@ -1,0 +1,80 @@
+[
+  {
+    "id": "bn",
+    "state_25C": "твёрдое",
+    "melt_low_C": null,
+    "melt_high_C": null,
+    "boil_C": null,
+    "decomp_C": 2973,
+    "liquid_exists": false,
+    "heating_path": "твёрдое → сублимация (≈2973 °C)",
+    "note": "Плавления при 1 атм нет; AmericanElements подписывает 2973 °C как точку плавления, Goodfellow даёт сублимацию 2600–2800 °C, значения зависят от формы и атмосферы; для c-BN значение не найдено.",
+    "conf": "справочно",
+    "source": "https://americanelements.com/boron-nitride.html"
+  },
+  {
+    "id": "perov",
+    "state_25C": "твёрдое",
+    "melt_low_C": 1285,
+    "melt_high_C": 2080,
+    "boil_C": null,
+    "decomp_C": null,
+    "liquid_exists": true,
+    "heating_path": "твёрдое → жидкое (≈1285–2080 °C)",
+    "note": "Диапазон: PbTiO3 ≈1285 °C, BaTiO3 1625 °C, SrTiO3 2080 °C; точки плавления для PZT и LaMnO3 не найдены (PZT спекают при 1100–1300 °C с потерей PbO), каталожные значения PbTiO3 расходятся (1120–1756 °C).",
+    "conf": "оценка",
+    "source": "https://en.wikipedia.org/wiki/Strontium_titanate"
+  },
+  {
+    "id": "zeol",
+    "state_25C": "твёрдое",
+    "melt_low_C": null,
+    "melt_high_C": null,
+    "boil_C": null,
+    "decomp_C": 350,
+    "liquid_exists": false,
+    "heating_path": "твёрдое → потеря воды (≈80–400 °C) → аморфизация/разрушение каркаса (≈350–800 °C) → плотные фазы (кристобалит, кварц); плавления нет",
+    "note": "Температура разрушения каркаса зависит от типа: от ≈350 °C у слабых (например, лаумонтит) до >800 °C у устойчивых (zeolite L без изменений до 814 °C); плавления не происходит.",
+    "conf": "оценка",
+    "source": "https://msaweb.org/MSA/AmMin/products/AmMin/AM096P1070.pdf"
+  },
+  {
+    "id": "mof",
+    "state_25C": "твёрдое",
+    "melt_low_C": 437,
+    "melt_high_C": 590,
+    "boil_C": null,
+    "decomp_C": 250,
+    "liquid_exists": true,
+    "heating_path": "твёрдое → разложение (≈250–400 °C) для большинства MOF; исключение: ZIF-62 плавится ≈437 °C (710 K), ZIF-4 ≈590 °C (863 K) → стекло при закалке",
+    "note": "MOF-5, HKUST-1, UiO-66 и ZIF-8 разлагаются до плавления (ZIF-8 по разным TGA-данным от ≈300 до ≈600 °C); жидкость при 1 атм дают только стеклообразующие ZIF, для них и указаны melt-значения.",
+    "conf": "оценка",
+    "source": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7325427"
+  },
+  {
+    "id": "miner",
+    "state_25C": "твёрдое",
+    "melt_low_C": -39,
+    "melt_high_C": 3300,
+    "boil_C": null,
+    "decomp_C": null,
+    "liquid_exists": true,
+    "heating_path": "твёрдое → жидкое (от −39 °C у самородной ртути до ≈3300 °C у торианита ThO₂)",
+    "note": "Жидкий минерал при 25 °C только самородная ртуть (Tпл −38.8 °C; её статус минерала спорен); верхняя граница 3300 °C по торианиту взята из неофициального источника, периклаз (2852 °C в задании) первичным источником не подтверждён, поиск дал 2800 °C.",
+    "conf": "оценка",
+    "source": "https://britannica.com/EBchecked/topic/375837"
+  },
+  {
+    "id": "steel",
+    "state_25C": "твёрдое",
+    "melt_low_C": 1370,
+    "melt_high_C": 1540,
+    "boil_C": null,
+    "decomp_C": null,
+    "liquid_exists": true,
+    "heating_path": "твёрдое → жидкое (солидус ≈1370 → ликвидус ≈1540 °C)",
+    "note": "Зависит от C, Mn, S и легирования: ликвидус снижается с ростом C и Mn; для Fe–1%C по одной работе солидус 1348 и ликвидус 1460 °C, чистое Fe плавится при 1538 °C.",
+    "conf": "оценка",
+    "source": "https://www.mwalloys.com/melting-point-of-steel-ranges-causes-measurement/"
+  }
+]

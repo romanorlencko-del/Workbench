@@ -1,0 +1,14 @@
+{
+  "description": "Собрано Claude: комбинаторика систем из 80 стабильных элементов (расчёт) и размеры баз данных — IMA (июль 2026), CAS Registry (2026), GNoME (2023), ICSD (оценка).",
+  "fixed": true,
+  "source": {
+    "kind": "file",
+    "name": "scale.json",
+    "url": "/_blob/e62bf4be89038a75b3bb7c4356aff58c"
+  },
+  "title": "Сводка: масштаб мира веществ",
+  "updated": {
+    "at": "2026-10-20T09:00:00Z",
+    "by": "Claude"
+  }
+}

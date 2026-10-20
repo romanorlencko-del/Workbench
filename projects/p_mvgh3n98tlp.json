@@ -1,0 +1,482 @@
+{
+  "version": 1,
+  "name": "Карта материалов: от элементов к сплавам",
+  "meta": {
+    "description": "Сбор и сверка свойств материалов (агрегатные состояния и др.) для дашборда «Карта материалов». Дашборд: https://claude.ai/artifact/6gJVkczyWaovoJUXbKnuzV. Данные и страница — в рабочей папке.",
+    "workdir": "/home/user/Workbench/workspace/Карта-материалов-от-элементов-к-сплавам",
+    "max_parallel": 4,
+    "log_level": "info",
+    "stage": "plan",
+    "input_reserve_tokens": 8000,
+    "models": {
+      "primary": {
+        "label": "Основная",
+        "provider": "openai-compatible",
+        "base_url": "https://api.gonka24.com/v1",
+        "model": "qwen3-235b",
+        "api_key_env": "GONKA_API_KEY",
+        "context_tokens": 160000,
+        "max_output_tokens": 16384
+      },
+      "heavy": {
+        "label": "Тяжёлая",
+        "provider": "openai-compatible",
+        "base_url": "",
+        "model": "glm-5.2",
+        "api_key_env": "GLM_API_KEY",
+        "context_tokens": 1000000,
+        "max_output_tokens": 32768
+      }
+    },
+    "rev": 1
+  },
+  "nodes": [
+    {
+      "id": "input_1f4n",
+      "type": "input",
+      "name": "Справочник элементов",
+      "x": 40,
+      "y": 40,
+      "enabled": true,
+      "params": {
+        "kind": "file",
+        "method": "GET",
+        "format": "json",
+        "schedule": "once",
+        "interval_s": 60,
+        "on_error": "retry",
+        "idem_store": "db_unique",
+        "idem_window_h": 24,
+        "breaker": "off",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "error",
+        "peak_factor": 1,
+        "env_over": [],
+        "source": "workspace/Карта-материалов-от-элементов-к-сплавам/data/elements.json",
+        "fields": [
+          "symbol",
+          "name_ru",
+          "kind"
+        ],
+        "dedupe_key": "symbol"
+      },
+      "notes": "Символ, русское название, тип (металл/неметалл/полуметалл). Фиксированный файл дашборда."
+    },
+    {
+      "id": "input_215i",
+      "type": "input",
+      "name": "Семейства материалов",
+      "x": 40,
+      "y": 170,
+      "enabled": true,
+      "params": {
+        "kind": "file",
+        "method": "GET",
+        "format": "json",
+        "schedule": "once",
+        "interval_s": 60,
+        "on_error": "retry",
+        "idem_store": "db_unique",
+        "idem_window_h": 24,
+        "breaker": "off",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "error",
+        "peak_factor": 1,
+        "env_over": [],
+        "source": "workspace/Карта-материалов-от-элементов-к-сплавам/data/materials.json",
+        "fields": [
+          "id",
+          "level",
+          "name",
+          "elements",
+          "theor",
+          "known",
+          "used",
+          "conf",
+          "source"
+        ],
+        "dedupe_key": "id"
+      },
+      "notes": "34 семейства по 5 уровням: простые вещества → бинарные → сложные → сплавы → композиты; теоретически/известно/применяется."
+    },
+    {
+      "id": "input_3p83",
+      "type": "input",
+      "name": "Масштаб мира веществ",
+      "x": 40,
+      "y": 300,
+      "enabled": true,
+      "params": {
+        "kind": "file",
+        "method": "GET",
+        "format": "json",
+        "schedule": "once",
+        "interval_s": 60,
+        "on_error": "retry",
+        "idem_store": "db_unique",
+        "idem_window_h": 24,
+        "breaker": "off",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "error",
+        "peak_factor": 1,
+        "env_over": [],
+        "source": "workspace/Карта-материалов-от-элементов-к-сплавам/data/scale.json",
+        "fields": [
+          "id",
+          "layer",
+          "theor",
+          "known"
+        ],
+        "dedupe_key": "id"
+      },
+      "notes": "Комбинаторика систем из 80 стабильных элементов и размеры баз: IMA, CAS, GNoME, ICSD."
+    },
+    {
+      "id": "merge_49y5",
+      "type": "merge",
+      "name": "Сводка входов",
+      "x": 350,
+      "y": 170,
+      "enabled": true,
+      "params": {
+        "strategy": "all",
+        "timeout_s": 60,
+        "output_var": "ctx.families"
+      },
+      "notes": ""
+    },
+    {
+      "id": "queue_5uw1",
+      "type": "queue",
+      "name": "Партии по 5–6 семейств",
+      "x": 660,
+      "y": 170,
+      "enabled": true,
+      "params": {
+        "mode": "parallel",
+        "concurrency": 6,
+        "order": "fifo",
+        "priority": 0,
+        "retry": 1,
+        "backoff": "exponential",
+        "backoff_s": 1,
+        "backoff_max_s": 30,
+        "jitter": true,
+        "rate_limit": 0,
+        "idem_store": "db_unique",
+        "idem_window_h": 24,
+        "on_error": "skip"
+      },
+      "notes": "6 партий параллельно (как в первом прогоне). Партии и их состав — в agents/README.md."
+    },
+    {
+      "id": "kb_6oab",
+      "type": "kb",
+      "name": "Справочные источники",
+      "x": 660,
+      "y": 352,
+      "enabled": true,
+      "params": {
+        "kind": "url",
+        "glob": "**/*.md",
+        "top_k": 5,
+        "chunk_size": 800,
+        "chunk_overlap": 120,
+        "refresh": "manual",
+        "interval_min": 60,
+        "source": "https://en.wikipedia.org, https://ru.wikipedia.org, https://webbook.nist.gov, https://pubchem.ncbi.nlm.nih.gov"
+      },
+      "notes": "В облачном окружении эти домены были закрыты сетевой политикой — агенты видели только сниппеты поиска. Открыть домены и перезапустить сбор."
+    },
+    {
+      "id": "agent_72rw",
+      "type": "agent",
+      "name": "Агенты Haiku: агрегатные состояния",
+      "x": 970,
+      "y": 170,
+      "enabled": true,
+      "params": {
+        "provider": "anthropic",
+        "base_url": "https://api.anthropic.com/v1",
+        "api_key_env": "ANTHROPIC_API_KEY",
+        "model_ref": "primary",
+        "temperature": 0,
+        "max_tokens": 4096,
+        "graph_in": false,
+        "output_var": "ctx.states_raw",
+        "on_error": "continue",
+        "retry": 2,
+        "backoff": "exponential",
+        "backoff_s": 1,
+        "backoff_max_s": 30,
+        "jitter": true,
+        "timeout_s": 180,
+        "stream": false,
+        "breaker": "off",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "error",
+        "model": "claude-haiku-5-5",
+        "prompt": "Для каждого семейства из партии (id, название, элементы) найди агрегатные состояния при 1 атм: state_25C, melt_low_C/melt_high_C (солидус–ликвидус или диапазон по семейству), boil_C, decomp_C (разложение/сублимация), liquid_exists, heating_path (короткая русская строка), note, conf (справочно|оценка), source (URL открытой страницы). Числа только со страниц, которые реально открыты; нет числа — null и пояснение в note. Результат — JSON-массив в states/batchN.json.",
+        "tools": [
+          "web_search",
+          "web_fetch",
+          "write_file"
+        ]
+      },
+      "notes": "По агенту на партию, с веб-поиском. Промпты первого прогона — agents/batch1..6.prompt.md."
+    },
+    {
+      "id": "process_857z",
+      "type": "process",
+      "name": "Сверка и заполнение пробелов",
+      "x": 1280,
+      "y": 170,
+      "enabled": true,
+      "params": {
+        "op": "clean",
+        "on_error": "fail",
+        "retry": 0,
+        "backoff": "exponential",
+        "backoff_s": 1,
+        "backoff_max_s": 30,
+        "jitter": true,
+        "idem_store": "db_unique",
+        "idem_window_h": 24,
+        "breaker": "off",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "error",
+        "publish_mode": "none",
+        "outbox_table": "outbox",
+        "relay": "worker",
+        "relay_interval_s": 1,
+        "outbox_keep_h": 24,
+        "peak_factor": 1,
+        "input_var": "ctx.states_raw",
+        "output_var": "ctx.states",
+        "rule": "conf = «сниппет поиска», если число из сниппета с URL; «по памяти», если заполнено или исправлено вручную. Стеклование и Tg не считать плавлением. Кипение > 5000 °C — только в тексте (иначе сжимается шкала).",
+        "fields": [
+          "id",
+          "state_25C",
+          "melt_low_C",
+          "melt_high_C",
+          "boil_C",
+          "decomp_C",
+          "liquid_exists",
+          "heating_path",
+          "note",
+          "conf",
+          "source"
+        ]
+      },
+      "notes": "scripts/build_states.py: сливает партии, правит ошибки, заполняет пустые числа справочными знаниями и ставит метку conf."
+    },
+    {
+      "id": "store_9m0l",
+      "type": "store",
+      "name": "Датасет phase_states",
+      "x": 1590,
+      "y": 170,
+      "enabled": true,
+      "params": {
+        "writes": [
+          "находки"
+        ],
+        "dataset": "phase_states",
+        "anonymize": true,
+        "target": "sqlite",
+        "uri": "workspace/Карта-материалов-от-элементов-к-сплавам/data/phase_states.json",
+        "keep": "forever",
+        "keep_days": 365,
+        "dedupe_key": "id",
+        "versioning": true,
+        "redact_secrets": true,
+        "store_snippets": false,
+        "output_var": "ctx.run_id",
+        "idem_store": "db_unique",
+        "idem_window_h": 24,
+        "publish_mode": "none",
+        "outbox_table": "outbox",
+        "relay": "worker",
+        "relay_interval_s": 1,
+        "outbox_keep_h": 24,
+        "peak_factor": 1,
+        "env_over": []
+      },
+      "notes": "Локальная копия: data/phase_states.json. На дашборде — датасет states (фиксированный файл)."
+    },
+    {
+      "id": "sink_alxw",
+      "type": "sink",
+      "name": "Дашборд «Карта материалов»",
+      "x": 1900,
+      "y": 170,
+      "enabled": true,
+      "params": {
+        "channel": "dashboard",
+        "method": "POST",
+        "format": "json",
+        "retry": 2,
+        "backoff": "exponential",
+        "backoff_s": 1,
+        "backoff_max_s": 30,
+        "jitter": true,
+        "on_error": "retry",
+        "idem_store": "db_unique",
+        "idem_window_h": 24,
+        "breaker": "off",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "error",
+        "publish_mode": "none",
+        "outbox_table": "outbox",
+        "relay": "worker",
+        "relay_interval_s": 1,
+        "outbox_keep_h": 24,
+        "peak_factor": 1,
+        "env_over": [],
+        "target": "https://claude.ai/artifact/6gJVkczyWaovoJUXbKnuzV"
+      },
+      "notes": "Страница — dashboard/index.html, документы датасетов — dashboard/datasets/*.json. Обновление: загрузить файл в ассеты и поменять url датасета."
+    },
+    {
+      "id": "note_bgij",
+      "type": "note",
+      "name": "Что доработать",
+      "x": 40,
+      "y": -101,
+      "enabled": true,
+      "params": {
+        "text": "1) Открыть справочные домены и перепроверить все 34 строки по открытым страницам.\n2) Подтвердить: ВЭС (сплав Кантора), NiTi, SmCo5, PZT, LaMnO3, 7075, 430, Waspaloy, CMSX-4, периклаз.\n3) Агрегатные состояния для самих элементов (справочник элементов).\n4) Заменить метки «по памяти» на ссылки."
+      },
+      "notes": ""
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_cl3x",
+      "from": {
+        "node": "input_1f4n",
+        "port": "out"
+      },
+      "to": {
+        "node": "merge_49y5",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_dz9g",
+      "from": {
+        "node": "input_215i",
+        "port": "out"
+      },
+      "to": {
+        "node": "merge_49y5",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_e7pf",
+      "from": {
+        "node": "input_3p83",
+        "port": "out"
+      },
+      "to": {
+        "node": "merge_49y5",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_fmy8",
+      "from": {
+        "node": "merge_49y5",
+        "port": "out"
+      },
+      "to": {
+        "node": "queue_5uw1",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_gton",
+      "from": {
+        "node": "queue_5uw1",
+        "port": "out"
+      },
+      "to": {
+        "node": "agent_72rw",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_h7uz",
+      "from": {
+        "node": "kb_6oab",
+        "port": "data"
+      },
+      "to": {
+        "node": "agent_72rw",
+        "port": "kb"
+      },
+      "kind": "data"
+    },
+    {
+      "id": "e_igjm",
+      "from": {
+        "node": "agent_72rw",
+        "port": "out"
+      },
+      "to": {
+        "node": "process_857z",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_j262",
+      "from": {
+        "node": "process_857z",
+        "port": "out"
+      },
+      "to": {
+        "node": "store_9m0l",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_kji3",
+      "from": {
+        "node": "store_9m0l",
+        "port": "out"
+      },
+      "to": {
+        "node": "sink_alxw",
+        "port": "in"
+      },
+      "kind": "flow"
+    }
+  ],
+  "seq": 21
+}

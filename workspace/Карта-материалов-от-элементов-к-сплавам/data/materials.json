@@ -199,7 +199,7 @@
 "level": 3,
 "level_name": "3 · Сложные соединения и каркасы",
 "name": "Перовскиты ABO₃",
-"elements": "Ba;Ti;Pb;Zr;Sr;La;O",
+"elements": "Ba;Ti;Pb;Zr;Sr;La;O;Mn",
 "theor": 5329,
 "theor_label": "5 329 составов рассчитано (DFT)",
 "known": null,

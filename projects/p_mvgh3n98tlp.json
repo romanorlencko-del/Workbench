@@ -28,7 +28,7 @@
         "max_output_tokens": 32768
       }
     },
-    "rev": 4
+    "rev": 7
   },
   "nodes": [
     {
@@ -36,7 +36,7 @@
       "type": "input",
       "name": "Справочник элементов",
       "x": 40,
-      "y": 1096,
+      "y": 1356,
       "enabled": true,
       "params": {
         "kind": "file",
@@ -71,7 +71,7 @@
       "type": "input",
       "name": "Семейства материалов",
       "x": 40,
-      "y": 1319,
+      "y": 1579,
       "enabled": true,
       "params": {
         "kind": "file",
@@ -112,7 +112,7 @@
       "type": "input",
       "name": "Масштаб мира веществ",
       "x": 40,
-      "y": 1542,
+      "y": 1802,
       "enabled": true,
       "params": {
         "kind": "file",
@@ -148,7 +148,7 @@
       "type": "merge",
       "name": "Сводка входов",
       "x": 350,
-      "y": 1365,
+      "y": 1599,
       "enabled": true,
       "params": {
         "strategy": "all",
@@ -162,7 +162,7 @@
       "type": "queue",
       "name": "Партии по 5–6 семейств",
       "x": 660,
-      "y": 1339,
+      "y": 1599,
       "enabled": true,
       "params": {
         "mode": "parallel",
@@ -186,7 +186,7 @@
       "type": "kb",
       "name": "Справочные источники",
       "x": 660,
-      "y": 1575,
+      "y": 1835,
       "enabled": true,
       "params": {
         "kind": "url",
@@ -205,7 +205,7 @@
       "type": "agent",
       "name": "Агенты Haiku: агрегатные состояния",
       "x": 970,
-      "y": 1339,
+      "y": 1599,
       "enabled": true,
       "params": {
         "provider": "anthropic",
@@ -245,7 +245,7 @@
       "type": "process",
       "name": "Сверка и заполнение пробелов",
       "x": 1280,
-      "y": 1331,
+      "y": 1591,
       "enabled": true,
       "params": {
         "op": "clean",
@@ -293,7 +293,7 @@
       "type": "store",
       "name": "Датасет phase_states",
       "x": 1590,
-      "y": 1340,
+      "y": 1600,
       "enabled": true,
       "params": {
         "writes": [
@@ -323,42 +323,6 @@
       "notes": "Локальная копия: data/phase_states.json. На дашборде — датасет states (фиксированный файл)."
     },
     {
-      "id": "sink_alxw",
-      "type": "sink",
-      "name": "Дашборд «Карта материалов»",
-      "x": 1900,
-      "y": 1458,
-      "enabled": true,
-      "params": {
-        "channel": "dashboard",
-        "method": "POST",
-        "format": "json",
-        "retry": 2,
-        "backoff": "exponential",
-        "backoff_s": 1,
-        "backoff_max_s": 30,
-        "jitter": true,
-        "on_error": "retry",
-        "idem_store": "db_unique",
-        "idem_window_h": 24,
-        "breaker": "off",
-        "breaker_threshold": 50,
-        "breaker_window": 20,
-        "breaker_open_s": 30,
-        "breaker_probe": 1,
-        "breaker_fallback": "error",
-        "publish_mode": "none",
-        "outbox_table": "outbox",
-        "relay": "worker",
-        "relay_interval_s": 1,
-        "outbox_keep_h": 24,
-        "peak_factor": 1,
-        "env_over": [],
-        "target": "https://claude.ai/artifact/6gJVkczyWaovoJUXbKnuzV"
-      },
-      "notes": "Страница — dashboard/index.html, документы датасетов — dashboard/datasets/*.json. Обновление: загрузить файл в ассеты и поменять url датасета."
-    },
-    {
       "id": "note_bgij",
       "type": "note",
       "name": "Что доработать",
@@ -375,7 +339,7 @@
       "type": "agent",
       "name": "Агенты Haiku: применение и названия",
       "x": 970,
-      "y": 1523,
+      "y": 1783,
       "enabled": true,
       "params": {
         "provider": "anthropic",
@@ -414,7 +378,7 @@
       "type": "process",
       "name": "Сверка: применение",
       "x": 1280,
-      "y": 1584,
+      "y": 1844,
       "enabled": true,
       "params": {
         "op": "clean",
@@ -460,7 +424,7 @@
       "type": "store",
       "name": "Датасет applications",
       "x": 1590,
-      "y": 1593,
+      "y": 1853,
       "enabled": true,
       "params": {
         "writes": [
@@ -494,7 +458,7 @@
       "type": "entity",
       "name": "Сущность: элемент",
       "x": 40,
-      "y": 481,
+      "y": 741,
       "enabled": true,
       "params": {
         "fields": [
@@ -535,7 +499,7 @@
       "type": "entity",
       "name": "Сущность: семейство материалов",
       "x": 40,
-      "y": 604,
+      "y": 864,
       "enabled": true,
       "params": {
         "fields": [
@@ -633,7 +597,7 @@
       "type": "entity",
       "name": "Сущность: слой масштаба",
       "x": 40,
-      "y": 727,
+      "y": 987,
       "enabled": true,
       "params": {
         "fields": [
@@ -695,7 +659,7 @@
       "type": "entity",
       "name": "Сущность: агрегатное состояние",
       "x": 40,
-      "y": 850,
+      "y": 1110,
       "enabled": true,
       "params": {
         "fields": [
@@ -790,7 +754,7 @@
       "type": "entity",
       "name": "Сущность: применение",
       "x": 40,
-      "y": 973,
+      "y": 1233,
       "enabled": true,
       "params": {
         "fields": [
@@ -865,7 +829,7 @@
       "type": "decision",
       "name": "Решение: метка вместо отказа",
       "x": 40,
-      "y": 187,
+      "y": 317,
       "enabled": true,
       "params": {
         "status": "trial",
@@ -874,7 +838,7 @@
         "affects": [
           "process_857z",
           "process_mrfm",
-          "sink_alxw"
+          "sink_19j7m"
         ],
         "context": "сетевая политика окружения закрыла справочные сайты; агенты видели только сниппеты поиска",
         "rejected": "ждать доступа — работа стоит;\nпустые ячейки вместо оценок — дашборд без ответа на вопрос",
@@ -888,7 +852,7 @@
       "type": "decision",
       "name": "Решение: словарь отраслей",
       "x": 40,
-      "y": 334,
+      "y": 464,
       "enabled": true,
       "params": {
         "status": "accepted",
@@ -930,8 +894,8 @@
       "id": "output_11vxp",
       "type": "output",
       "name": "Итог: ссылка на дашборд",
-      "x": 2210,
-      "y": 1494,
+      "x": 2830,
+      "y": 1809,
       "enabled": true,
       "params": {
         "target": "console",
@@ -939,6 +903,293 @@
         "append": false
       },
       "notes": "Конец конвейера: в отчёт прогона — ссылка на дашборд и версии датасетов (ctx.phase_states_ver, ctx.applications_ver)."
+    },
+    {
+      "id": "kb_13s90",
+      "type": "kb",
+      "name": "Таблица Менделеева (локально)",
+      "x": 1900,
+      "y": 1809,
+      "enabled": true,
+      "params": {
+        "kind": "files",
+        "glob": "**/*.md",
+        "top_k": 5,
+        "chunk_size": 800,
+        "chunk_overlap": 120,
+        "refresh": "manual",
+        "interval_min": 60,
+        "source": "workspace/Карта-материалов-от-элементов-к-сплавам/vendor/pymatgen_periodic_table.json.gz; pip: mendeleev==1.3.0"
+      },
+      "notes": "Две независимые базы без сети: пакет mendeleev 1.3.0 (массы, T пл/кип, теплоты, изотопы) и таблица pymatgen-core (массы, T пл/кип). Где расходятся — сравнение с диапазоном."
+    },
+    {
+      "id": "loop_143lc",
+      "type": "loop",
+      "name": "Цикл пересчёта",
+      "x": 1900,
+      "y": 1627,
+      "enabled": true,
+      "params": {
+        "mode": "while",
+        "items_var": "ctx.items",
+        "max_iterations": 3,
+        "delay_s": 0,
+        "break_on_error": true,
+        "condition": "ctx.recalc.passes == 0 || ctx.recalc.applied > 0"
+      },
+      "notes": "Повторяет проход, пока он что-то исправляет. Каждый проход — все проверки по всем семействам."
+    },
+    {
+      "id": "script_15fad",
+      "type": "script",
+      "name": "Пересчёт по таблице Менделеева и законам",
+      "x": 2210,
+      "y": 1627,
+      "enabled": true,
+      "params": {
+        "runtime": "python",
+        "code": "python3 scripts/recalc.py --apply --max-iter 1 --summary-json",
+        "timeout_s": 120,
+        "output_var": "ctx.recalc",
+        "on_error": "fail",
+        "retry": 0,
+        "backoff": "exponential",
+        "backoff_s": 1,
+        "backoff_max_s": 30,
+        "jitter": true,
+        "breaker": "off",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "error",
+        "peak_factor": 1,
+        "cwd": "workspace/Карта-материалов-от-элементов-к-сплавам"
+      },
+      "notes": "scripts/recalc.py. Проверки: комбинаторика C(80,k) и число стабильных элементов по изотопам; применяется ≤ известно ≤ теоретически; тип элемента по серии; формулы ⊆ элементы семейства и молярные массы; T пл/кип чистых элементов и основ сплавов по обеим базам; солидус < Tпл основы, ликвидус ≤ Tпл основы (кроме изоморфных систем); эвтектики Fe–C и Sn–Bi; правила Трутона и Ричардса; согласованность фаз и чисел в тексте. Исправляет только точно вычислимое."
+    },
+    {
+      "id": "condition_16ony",
+      "type": "condition",
+      "name": "Остались ошибки?",
+      "x": 2520,
+      "y": 1627,
+      "enabled": true,
+      "params": {
+        "expression": "(ctx.recalc.counts.fail || 0) > 0",
+        "note": "ошибки без точного ответа — на разбор человеку"
+      },
+      "notes": "Читает итог прохода (ctx.recalc.counts.fail). Ошибки без точного ответа уходят на разбор человеку; иначе — следующий виток цикла, который остановится, когда проход ничего не исправит."
+    },
+    {
+      "id": "task_17fvh",
+      "type": "task",
+      "name": "Разбор расхождений",
+      "x": 2830,
+      "y": 1627,
+      "enabled": true,
+      "params": {
+        "output_var": "ctx.recalc_review",
+        "timeout_s": 120,
+        "on_error": "fail",
+        "retry": 0,
+        "backoff": "exponential",
+        "backoff_s": 1,
+        "backoff_max_s": 30,
+        "jitter": true,
+        "breaker": "off",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "error",
+        "peak_factor": 1,
+        "instruction": "Открыть data/checks/recalc_report.md, по каждой ошибке найти первоисточник, исправить data/*.json или правило в scripts/recalc.py и вернуть управление в цикл.",
+        "inputs": [
+          "ctx.recalc"
+        ]
+      },
+      "notes": "Ошибки, которые модуль не может исправить сам: решить по первоисточнику, поправить данные или правило в recalc.py."
+    },
+    {
+      "id": "store_18xew",
+      "type": "store",
+      "name": "Отчёт пересчёта",
+      "x": 2210,
+      "y": 1757,
+      "enabled": true,
+      "params": {
+        "writes": [
+          "находки"
+        ],
+        "dataset": "recalc_report",
+        "anonymize": true,
+        "target": "sqlite",
+        "uri": "workspace/Карта-материалов-от-элементов-к-сплавам/data/checks/recalc_report.json",
+        "keep": "forever",
+        "keep_days": 365,
+        "dedupe_key": "project_id + file + rule + code_hash",
+        "versioning": true,
+        "redact_secrets": true,
+        "store_snippets": false,
+        "output_var": "ctx.recalc_ver",
+        "idem_store": "db_unique",
+        "idem_window_h": 24,
+        "publish_mode": "none",
+        "outbox_table": "outbox",
+        "relay": "worker",
+        "relay_interval_s": 1,
+        "outbox_keep_h": 24,
+        "peak_factor": 1,
+        "env_over": []
+      },
+      "notes": "data/checks/recalc_report.json и .md, data/derived.json (молярные массы и массовые доли)."
+    },
+    {
+      "id": "sink_19j7m",
+      "type": "sink",
+      "name": "Дашборд «Карта материалов»",
+      "x": 2520,
+      "y": 1819,
+      "enabled": true,
+      "params": {
+        "channel": "dashboard",
+        "method": "POST",
+        "format": "json",
+        "retry": 2,
+        "backoff": "exponential",
+        "backoff_s": 1,
+        "backoff_max_s": 30,
+        "jitter": true,
+        "on_error": "retry",
+        "idem_store": "db_unique",
+        "idem_window_h": 24,
+        "breaker": "off",
+        "breaker_threshold": 50,
+        "breaker_window": 20,
+        "breaker_open_s": 30,
+        "breaker_probe": 1,
+        "breaker_fallback": "error",
+        "publish_mode": "none",
+        "outbox_table": "outbox",
+        "relay": "worker",
+        "relay_interval_s": 1,
+        "outbox_keep_h": 24,
+        "peak_factor": 1,
+        "env_over": [],
+        "target": "https://claude.ai/artifact/6gJVkczyWaovoJUXbKnuzV"
+      },
+      "notes": "Страница — dashboard/index.html, документы датасетов — dashboard/store/. Обновление: загрузить файл в ассеты и поменять url датасета."
+    },
+    {
+      "id": "entity_1a7v1",
+      "type": "entity",
+      "name": "Сущность: находка проверки",
+      "x": 40,
+      "y": 611,
+      "enabled": true,
+      "params": {
+        "fields": [
+          {
+            "name": "id",
+            "kind": "string",
+            "required": true,
+            "note": "семейство, слой масштаба или символ элемента"
+          },
+          {
+            "name": "check",
+            "kind": "string",
+            "required": true
+          },
+          {
+            "name": "law",
+            "kind": "string",
+            "required": true,
+            "note": "закон или источник сравнения"
+          },
+          {
+            "name": "status",
+            "kind": "enum",
+            "values": [
+              "ok",
+              "warn",
+              "fail",
+              "info",
+              "calc"
+            ],
+            "required": true
+          },
+          {
+            "name": "value",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "expected",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "note",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "field",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "dataset",
+            "kind": "enum",
+            "values": [
+              "materials",
+              "scale",
+              "elements",
+              "states"
+            ],
+            "required": false
+          },
+          {
+            "name": "fixable",
+            "kind": "bool",
+            "required": true,
+            "note": "есть точный ответ — цикл исправит сам"
+          }
+        ],
+        "key": "check_finding",
+        "vars": [
+          "ctx.recalc"
+        ],
+        "id_field": "id",
+        "owner": "Пересчёт по таблице Менделеева и законам"
+      },
+      "notes": ""
+    },
+    {
+      "id": "decision_1bgnf",
+      "type": "decision",
+      "name": "Решение: автоисправление только точного",
+      "x": 40,
+      "y": 187,
+      "enabled": true,
+      "params": {
+        "status": "accepted",
+        "title": "цикл правит только то, что вычисляется однозначно",
+        "date": "2026-10-20",
+        "affects": [
+          "script_15fad",
+          "loop_143lc",
+          "process_857z",
+          "process_mrfm"
+        ],
+        "context": "модуль пересчёта сверяет данные с таблицей Менделеева и законами; часть расхождений — спор источников, а не ошибка",
+        "rejected": "править всё по одной базе — mendeleev и pymatgen расходятся до 367 °C (кипение Cu), одна база не арбитр;\nничего не править — точные ошибки (комбинаторика, формула ↔ элементы) висели бы вручную",
+        "costs": "предупреждения (эвтектика чугуна, текст пути SiC) ждут человека",
+        "revisit": "когда появятся открытые первоисточники — добавить их третьей базой и расширить автоисправление"
+      },
+      "notes": ""
     }
   ],
   "edges": [
@@ -1039,18 +1290,6 @@
       "kind": "flow"
     },
     {
-      "id": "e_kji3",
-      "from": {
-        "node": "store_9m0l",
-        "port": "out"
-      },
-      "to": {
-        "node": "sink_alxw",
-        "port": "in"
-      },
-      "kind": "flow"
-    },
-    {
       "id": "e_o384",
       "from": {
         "node": "queue_5uw1",
@@ -1099,21 +1338,129 @@
       "kind": "flow"
     },
     {
-      "id": "e_s2by",
+      "id": "e_1crrm",
       "from": {
-        "node": "store_np3v",
+        "node": "store_9m0l",
         "port": "out"
       },
       "to": {
-        "node": "sink_alxw",
+        "node": "loop_143lc",
         "port": "in"
       },
       "kind": "flow"
     },
     {
-      "id": "e_12ol8",
+      "id": "e_1dpeh",
       "from": {
-        "node": "sink_alxw",
+        "node": "loop_143lc",
+        "port": "body"
+      },
+      "to": {
+        "node": "script_15fad",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_1ev8r",
+      "from": {
+        "node": "kb_13s90",
+        "port": "data"
+      },
+      "to": {
+        "node": "script_15fad",
+        "port": "kb"
+      },
+      "kind": "data"
+    },
+    {
+      "id": "e_1f14m",
+      "from": {
+        "node": "script_15fad",
+        "port": "out"
+      },
+      "to": {
+        "node": "condition_16ony",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_1gzkh",
+      "from": {
+        "node": "condition_16ony",
+        "port": "false"
+      },
+      "to": {
+        "node": "loop_143lc",
+        "port": "loop_back"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_1h0fr",
+      "from": {
+        "node": "condition_16ony",
+        "port": "true"
+      },
+      "to": {
+        "node": "task_17fvh",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_1iol8",
+      "from": {
+        "node": "task_17fvh",
+        "port": "out"
+      },
+      "to": {
+        "node": "loop_143lc",
+        "port": "loop_back"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_1j3gf",
+      "from": {
+        "node": "loop_143lc",
+        "port": "done"
+      },
+      "to": {
+        "node": "store_18xew",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_1kbl2",
+      "from": {
+        "node": "store_18xew",
+        "port": "out"
+      },
+      "to": {
+        "node": "sink_19j7m",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_1lv1u",
+      "from": {
+        "node": "store_np3v",
+        "port": "out"
+      },
+      "to": {
+        "node": "sink_19j7m",
+        "port": "in"
+      },
+      "kind": "flow"
+    },
+    {
+      "id": "e_1m6g0",
+      "from": {
+        "node": "sink_19j7m",
         "port": "out"
       },
       "to": {
@@ -1123,5 +1470,5 @@
       "kind": "flow"
     }
   ],
-  "seq": 39
+  "seq": 59
 }

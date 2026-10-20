@@ -1,0 +1,297 @@
+{
+ "fe_ox": [
+  {
+   "formula": "FeO",
+   "molar_mass": 71.844,
+   "mass_pct": {
+    "Fe": 77.73,
+    "O": 22.27
+   }
+  },
+  {
+   "formula": "Fe2O3",
+   "molar_mass": 159.687,
+   "mass_pct": {
+    "Fe": 69.94,
+    "O": 30.06
+   }
+  },
+  {
+   "formula": "Fe3O4",
+   "molar_mass": 231.531,
+   "mass_pct": {
+    "Fe": 72.36,
+    "O": 27.64
+   }
+  },
+  {
+   "formula": "FeOOH",
+   "molar_mass": 88.851,
+   "mass_pct": {
+    "Fe": 62.85,
+    "O": 36.01,
+    "H": 1.13
+   }
+  }
+ ],
+ "al2o3": [
+  {
+   "formula": "Al2O3",
+   "molar_mass": 101.96,
+   "mass_pct": {
+    "Al": 52.93,
+    "O": 47.07
+   }
+  }
+ ],
+ "sio2": [
+  {
+   "formula": "SiO2",
+   "molar_mass": 60.083,
+   "mass_pct": {
+    "Si": 46.74,
+    "O": 53.26
+   }
+  }
+ ],
+ "tio2": [
+  {
+   "formula": "TiO2",
+   "molar_mass": 79.865,
+   "mass_pct": {
+    "Ti": 59.93,
+    "O": 40.07
+   }
+  }
+ ],
+ "sic": [
+  {
+   "formula": "SiC",
+   "molar_mass": 40.096,
+   "mass_pct": {
+    "Si": 70.04,
+    "C": 29.96
+   }
+  }
+ ],
+ "si3n4": [
+  {
+   "formula": "Si3N4",
+   "molar_mass": 140.283,
+   "mass_pct": {
+    "Si": 60.06,
+    "N": 39.94
+   }
+  }
+ ],
+ "wc": [
+  {
+   "formula": "WC",
+   "molar_mass": 195.851,
+   "mass_pct": {
+    "W": 93.87,
+    "C": 6.13
+   }
+  },
+  {
+   "formula": "W2C",
+   "molar_mass": 379.691,
+   "mass_pct": {
+    "W": 96.84,
+    "C": 3.16
+   }
+  }
+ ],
+ "bn": [
+  {
+   "formula": "BN",
+   "molar_mass": 24.817,
+   "mass_pct": {
+    "B": 43.56,
+    "N": 56.44
+   }
+  }
+ ],
+ "perov": [
+  {
+   "formula": "BaTiO3",
+   "molar_mass": 233.191,
+   "mass_pct": {
+    "Ba": 58.89,
+    "Ti": 20.53,
+    "O": 20.58
+   }
+  },
+  {
+   "formula": "SrTiO3",
+   "molar_mass": 183.484,
+   "mass_pct": {
+    "Sr": 47.75,
+    "Ti": 26.09,
+    "O": 26.16
+   }
+  },
+  {
+   "formula": "PbTiO3",
+   "molar_mass": 303.064,
+   "mass_pct": {
+    "Pb": 68.37,
+    "Ti": 15.79,
+    "O": 15.84
+   }
+  },
+  {
+   "formula": "PbZr0.52Ti0.48O3",
+   "molar_mass": 325.61,
+   "mass_pct": {
+    "Pb": 63.63,
+    "Zr": 14.57,
+    "Ti": 7.06,
+    "O": 14.74
+   }
+  },
+  {
+   "formula": "LaMnO3",
+   "molar_mass": 241.841,
+   "mass_pct": {
+    "La": 57.44,
+    "Mn": 22.72,
+    "O": 19.85
+   }
+  }
+ ],
+ "zeol": [
+  {
+   "formula": "Na12Al12Si12O48",
+   "molar_mass": 1704.628,
+   "mass_pct": {
+    "Na": 16.18,
+    "Al": 18.99,
+    "Si": 19.77,
+    "O": 45.05
+   }
+  }
+ ],
+ "solder": [
+  {
+   "formula": "SnPb",
+   "molar_mass": 325.91,
+   "mass_pct": {
+    "Sn": 36.42,
+    "Pb": 63.58
+   }
+  },
+  {
+   "formula": "SnCu",
+   "molar_mass": 182.256,
+   "mass_pct": {
+    "Sn": 65.13,
+    "Cu": 34.87
+   }
+  },
+  {
+   "formula": "SnBi",
+   "molar_mass": 327.69,
+   "mass_pct": {
+    "Sn": 36.23,
+    "Bi": 63.77
+   }
+  },
+  {
+   "formula": "SnAg",
+   "molar_mass": 226.578,
+   "mass_pct": {
+    "Sn": 52.39,
+    "Ag": 47.61
+   }
+  }
+ ],
+ "intermet": [
+  {
+   "formula": "NiTi",
+   "molar_mass": 106.56,
+   "mass_pct": {
+    "Ni": 55.08,
+    "Ti": 44.92
+   }
+  },
+  {
+   "formula": "TiAl",
+   "molar_mass": 74.849,
+   "mass_pct": {
+    "Ti": 63.95,
+    "Al": 36.05
+   }
+  },
+  {
+   "formula": "Ni3Al",
+   "molar_mass": 203.062,
+   "mass_pct": {
+    "Ni": 86.71,
+    "Al": 13.29
+   }
+  },
+  {
+   "formula": "NiAl",
+   "molar_mass": 85.675,
+   "mass_pct": {
+    "Ni": 68.51,
+    "Al": 31.49
+   }
+  },
+  {
+   "formula": "Nd2Fe14B",
+   "molar_mass": 1081.124,
+   "mass_pct": {
+    "Nd": 26.68,
+    "Fe": 72.32,
+    "B": 1.0
+   }
+  },
+  {
+   "formula": "SmCo5",
+   "molar_mass": 445.026,
+   "mass_pct": {
+    "Sm": 33.79,
+    "Co": 66.21
+   }
+  }
+ ],
+ "hardmet": [
+  {
+   "formula": "WC",
+   "molar_mass": 195.851,
+   "mass_pct": {
+    "W": 93.87,
+    "C": 6.13
+   }
+  },
+  {
+   "formula": "Co",
+   "molar_mass": 58.933,
+   "mass_pct": {
+    "Co": 100.0
+   }
+  }
+ ],
+ "mmc": [
+  {
+   "formula": "SiC",
+   "molar_mass": 40.096,
+   "mass_pct": {
+    "Si": 70.04,
+    "C": 29.96
+   }
+  }
+ ],
+ "cmc": [
+  {
+   "formula": "SiC",
+   "molar_mass": 40.096,
+   "mass_pct": {
+    "Si": 70.04,
+    "C": 29.96
+   }
+  }
+ ]
+}

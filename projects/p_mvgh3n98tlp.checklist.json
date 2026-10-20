@@ -87,10 +87,10 @@
       "note": "recalc.py без пакета mendeleev сразу пишет «pip install -r requirements.txt» и выходит с кодом 1; check_entities.py без плана — понятная ошибка пути"
     },
     "g6_backup": {
-      "state": "todo",
-      "note": "копия — только git на GitHub; восстановление из клона не проверялось"
+      "state": "done",
+      "note": "копия — ветка claude/materials-map-project на GitHub; учебное восстановление 2026-10-20: чистый клон проходит check_entities, check_repro и recalc --strict, файлы после прогона не меняются"
     }
   },
   "custom": [],
-  "updatedAt": 1792531630305
+  "updatedAt": 1792532044304
 }

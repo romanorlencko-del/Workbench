@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "bench": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "mcp_server.py"
+      ],
+      "env": {
+        "TESTER_ENGINE_URL": "http://127.0.0.1:8792",
+        "NO_PROXY": "127.0.0.1,localhost"
+      }
+    }
+  }
+}

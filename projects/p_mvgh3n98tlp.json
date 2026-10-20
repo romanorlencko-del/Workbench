@@ -28,7 +28,7 @@
         "max_output_tokens": 32768
       }
     },
-    "rev": 2
+    "rev": 4
   },
   "nodes": [
     {
@@ -36,7 +36,7 @@
       "type": "input",
       "name": "Справочник элементов",
       "x": 40,
-      "y": 40,
+      "y": 1096,
       "enabled": true,
       "params": {
         "kind": "file",
@@ -61,7 +61,8 @@
           "name_ru",
           "kind"
         ],
-        "dedupe_key": "symbol"
+        "dedupe_key": "symbol",
+        "output_var": "ctx.elements"
       },
       "notes": "Символ, русское название, тип (металл/неметалл/полуметалл). Фиксированный файл дашборда."
     },
@@ -70,7 +71,7 @@
       "type": "input",
       "name": "Семейства материалов",
       "x": 40,
-      "y": 263,
+      "y": 1319,
       "enabled": true,
       "params": {
         "kind": "file",
@@ -101,7 +102,8 @@
           "conf",
           "source"
         ],
-        "dedupe_key": "id"
+        "dedupe_key": "id",
+        "output_var": "ctx.families"
       },
       "notes": "34 семейства по 5 уровням: простые вещества → бинарные → сложные → сплавы → композиты; теоретически/известно/применяется."
     },
@@ -110,7 +112,7 @@
       "type": "input",
       "name": "Масштаб мира веществ",
       "x": 40,
-      "y": 486,
+      "y": 1542,
       "enabled": true,
       "params": {
         "kind": "file",
@@ -136,7 +138,8 @@
           "theor",
           "known"
         ],
-        "dedupe_key": "id"
+        "dedupe_key": "id",
+        "output_var": "ctx.scale"
       },
       "notes": "Комбинаторика систем из 80 стабильных элементов и размеры баз: IMA, CAS, GNoME, ICSD."
     },
@@ -145,21 +148,21 @@
       "type": "merge",
       "name": "Сводка входов",
       "x": 350,
-      "y": 309,
+      "y": 1365,
       "enabled": true,
       "params": {
         "strategy": "all",
         "timeout_s": 60,
-        "output_var": "ctx.families"
+        "output_var": "ctx.sources"
       },
-      "notes": ""
+      "notes": "Ждёт все три справочника: семейства — главный вход, элементы и масштаб — контекст для агентов и графа на дашборде."
     },
     {
       "id": "queue_5uw1",
       "type": "queue",
       "name": "Партии по 5–6 семейств",
       "x": 660,
-      "y": 283,
+      "y": 1339,
       "enabled": true,
       "params": {
         "mode": "parallel",
@@ -183,7 +186,7 @@
       "type": "kb",
       "name": "Справочные источники",
       "x": 660,
-      "y": 519,
+      "y": 1575,
       "enabled": true,
       "params": {
         "kind": "url",
@@ -202,7 +205,7 @@
       "type": "agent",
       "name": "Агенты Haiku: агрегатные состояния",
       "x": 970,
-      "y": 283,
+      "y": 1339,
       "enabled": true,
       "params": {
         "provider": "anthropic",
@@ -242,7 +245,7 @@
       "type": "process",
       "name": "Сверка и заполнение пробелов",
       "x": 1280,
-      "y": 275,
+      "y": 1331,
       "enabled": true,
       "params": {
         "op": "clean",
@@ -290,7 +293,7 @@
       "type": "store",
       "name": "Датасет phase_states",
       "x": 1590,
-      "y": 284,
+      "y": 1340,
       "enabled": true,
       "params": {
         "writes": [
@@ -306,7 +309,7 @@
         "versioning": true,
         "redact_secrets": true,
         "store_snippets": false,
-        "output_var": "ctx.run_id",
+        "output_var": "ctx.phase_states_ver",
         "idem_store": "db_unique",
         "idem_window_h": 24,
         "publish_mode": "none",
@@ -324,7 +327,7 @@
       "type": "sink",
       "name": "Дашборд «Карта материалов»",
       "x": 1900,
-      "y": 384,
+      "y": 1458,
       "enabled": true,
       "params": {
         "channel": "dashboard",
@@ -372,7 +375,7 @@
       "type": "agent",
       "name": "Агенты Haiku: применение и названия",
       "x": 970,
-      "y": 467,
+      "y": 1523,
       "enabled": true,
       "params": {
         "provider": "anthropic",
@@ -411,7 +414,7 @@
       "type": "process",
       "name": "Сверка: применение",
       "x": 1280,
-      "y": 528,
+      "y": 1584,
       "enabled": true,
       "params": {
         "op": "clean",
@@ -457,7 +460,7 @@
       "type": "store",
       "name": "Датасет applications",
       "x": 1590,
-      "y": 528,
+      "y": 1593,
       "enabled": true,
       "params": {
         "writes": [
@@ -473,7 +476,7 @@
         "versioning": true,
         "redact_secrets": true,
         "store_snippets": false,
-        "output_var": "ctx.run_id",
+        "output_var": "ctx.applications_ver",
         "idem_store": "db_unique",
         "idem_window_h": 24,
         "publish_mode": "none",
@@ -485,6 +488,457 @@
         "env_over": []
       },
       "notes": "Локально: data/applications.json. На дашборде — датасет apps (матрица «семейство × отрасль», фильтр по отрасли, колонки таблицы)."
+    },
+    {
+      "id": "entity_t8ij",
+      "type": "entity",
+      "name": "Сущность: элемент",
+      "x": 40,
+      "y": 481,
+      "enabled": true,
+      "params": {
+        "fields": [
+          {
+            "name": "symbol",
+            "kind": "string",
+            "required": true,
+            "note": "символ, Fe"
+          },
+          {
+            "name": "name_ru",
+            "kind": "string",
+            "required": true,
+            "note": "русское название"
+          },
+          {
+            "name": "kind",
+            "kind": "enum",
+            "required": true,
+            "values": [
+              "металл",
+              "неметалл",
+              "полуметалл"
+            ]
+          }
+        ],
+        "key": "element",
+        "vars": [
+          "ctx.elements"
+        ],
+        "id_field": "symbol",
+        "owner": "справочник элементов"
+      },
+      "notes": ""
+    },
+    {
+      "id": "entity_u1nr",
+      "type": "entity",
+      "name": "Сущность: семейство материалов",
+      "x": 40,
+      "y": 604,
+      "enabled": true,
+      "params": {
+        "fields": [
+          {
+            "name": "id",
+            "kind": "string",
+            "required": true,
+            "note": "steel, sio2…"
+          },
+          {
+            "name": "level",
+            "kind": "enum",
+            "required": true,
+            "note": "1 простые → 5 композиты",
+            "values": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5"
+            ]
+          },
+          {
+            "name": "level_name",
+            "kind": "string",
+            "required": true
+          },
+          {
+            "name": "name",
+            "kind": "string",
+            "required": true
+          },
+          {
+            "name": "elements",
+            "kind": "list",
+            "required": true,
+            "note": "символы через «;», ссылки на element"
+          },
+          {
+            "name": "theor",
+            "kind": "number",
+            "required": false,
+            "note": "теоретический предел; пусто, если «∞»"
+          },
+          {
+            "name": "theor_label",
+            "kind": "string",
+            "required": true
+          },
+          {
+            "name": "known",
+            "kind": "number",
+            "required": false,
+            "note": "описано или стандартизовано"
+          },
+          {
+            "name": "known_label",
+            "kind": "string",
+            "required": true
+          },
+          {
+            "name": "used",
+            "kind": "number",
+            "required": false,
+            "note": "применяется в промышленности"
+          },
+          {
+            "name": "used_label",
+            "kind": "string",
+            "required": true
+          },
+          {
+            "name": "conf",
+            "kind": "string",
+            "required": true,
+            "note": "справочно | оценка"
+          },
+          {
+            "name": "source",
+            "kind": "string",
+            "required": false
+          }
+        ],
+        "key": "family",
+        "vars": [
+          "ctx.families"
+        ],
+        "id_field": "id",
+        "owner": "сводка семейств"
+      },
+      "notes": ""
+    },
+    {
+      "id": "entity_v8da",
+      "type": "entity",
+      "name": "Сущность: слой масштаба",
+      "x": 40,
+      "y": 727,
+      "enabled": true,
+      "params": {
+        "fields": [
+          {
+            "name": "id",
+            "kind": "string",
+            "required": true,
+            "note": "minerals, crystals, cas…"
+          },
+          {
+            "name": "layer",
+            "kind": "string",
+            "required": true
+          },
+          {
+            "name": "theor",
+            "kind": "number",
+            "required": false,
+            "note": "комбинаторный предел"
+          },
+          {
+            "name": "theor_label",
+            "kind": "string",
+            "required": true
+          },
+          {
+            "name": "known",
+            "kind": "number",
+            "required": false,
+            "note": "размер базы"
+          },
+          {
+            "name": "known_label",
+            "kind": "string",
+            "required": true
+          },
+          {
+            "name": "note",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "conf",
+            "kind": "string",
+            "required": true
+          }
+        ],
+        "key": "scale_layer",
+        "vars": [
+          "ctx.scale"
+        ],
+        "id_field": "id",
+        "owner": "сводка масштаба"
+      },
+      "notes": ""
+    },
+    {
+      "id": "entity_w1rd",
+      "type": "entity",
+      "name": "Сущность: агрегатное состояние",
+      "x": 40,
+      "y": 850,
+      "enabled": true,
+      "params": {
+        "fields": [
+          {
+            "name": "id",
+            "kind": "ref",
+            "required": true,
+            "note": "семейство",
+            "ref": "family"
+          },
+          {
+            "name": "state_25C",
+            "kind": "enum",
+            "required": true,
+            "note": "при 25 °C и 1 атм",
+            "values": [
+              "твёрдое",
+              "твёрдое (аморфное)",
+              "жидкое",
+              "газ"
+            ]
+          },
+          {
+            "name": "melt_low_C",
+            "kind": "number",
+            "required": false,
+            "note": "солидус или нижняя точка плавления по семейству, °C"
+          },
+          {
+            "name": "melt_high_C",
+            "kind": "number",
+            "required": false,
+            "note": "ликвидус или верхняя, °C"
+          },
+          {
+            "name": "boil_C",
+            "kind": "number",
+            "required": false,
+            "note": "кипение при 1 атм, °C"
+          },
+          {
+            "name": "decomp_C",
+            "kind": "number",
+            "required": false,
+            "note": "разложение, сублимация или испарение компонента, °C"
+          },
+          {
+            "name": "liquid_exists",
+            "kind": "bool",
+            "required": true,
+            "note": "есть ли жидкая фаза при 1 атм"
+          },
+          {
+            "name": "heating_path",
+            "kind": "string",
+            "required": true,
+            "note": "путь при нагреве одной строкой"
+          },
+          {
+            "name": "note",
+            "kind": "string",
+            "required": true
+          },
+          {
+            "name": "conf",
+            "kind": "enum",
+            "required": true,
+            "values": [
+              "сниппет поиска",
+              "по памяти"
+            ]
+          },
+          {
+            "name": "source",
+            "kind": "string",
+            "required": true,
+            "note": "URL сниппета или «по памяти (Claude)»"
+          }
+        ],
+        "key": "phase_state",
+        "vars": [
+          "ctx.states_raw",
+          "ctx.states"
+        ],
+        "id_field": "id",
+        "owner": "Сверка и заполнение пробелов"
+      },
+      "notes": ""
+    },
+    {
+      "id": "entity_xzwz",
+      "type": "entity",
+      "name": "Сущность: применение",
+      "x": 40,
+      "y": 973,
+      "enabled": true,
+      "params": {
+        "fields": [
+          {
+            "name": "id",
+            "kind": "ref",
+            "required": true,
+            "note": "семейство",
+            "ref": "family"
+          },
+          {
+            "name": "tech_name",
+            "kind": "string",
+            "required": true,
+            "note": "техническое название и ключевые формы"
+          },
+          {
+            "name": "tech_name_en",
+            "kind": "string",
+            "required": true
+          },
+          {
+            "name": "designations",
+            "kind": "string",
+            "required": false,
+            "note": "ГОСТ, EN, ISO, AISI, марки через «; »"
+          },
+          {
+            "name": "industries",
+            "kind": "list",
+            "required": true,
+            "note": "2–6 отраслей через «;», главная первой; только из словаря: Металлургия;Машиностроение;Автомобилестроение;Авиация и космос;Энергетика;Электроника;Электротехника;Строительство;Химия и катализ;Медицина;Инструмент;Оборона;Нефтегаз;Судостроение;Оптика;Ювелирное дело;Упаковка и быт;Экология и очистка;Сельское хозяйство;Наука"
+          },
+          {
+            "name": "applications",
+            "kind": "string",
+            "required": true,
+            "note": "3–5 применений через «; »"
+          },
+          {
+            "name": "note",
+            "kind": "string",
+            "required": true
+          },
+          {
+            "name": "conf",
+            "kind": "enum",
+            "required": true,
+            "values": [
+              "сниппет поиска",
+              "по памяти"
+            ]
+          },
+          {
+            "name": "source",
+            "kind": "string",
+            "required": false
+          }
+        ],
+        "key": "application",
+        "vars": [
+          "ctx.apps_raw",
+          "ctx.apps"
+        ],
+        "id_field": "id",
+        "owner": "Сверка: применение"
+      },
+      "notes": ""
+    },
+    {
+      "id": "decision_yv9w",
+      "type": "decision",
+      "name": "Решение: метка вместо отказа",
+      "x": 40,
+      "y": 187,
+      "enabled": true,
+      "params": {
+        "status": "trial",
+        "title": "непроверенные числа публикуем с меткой conf",
+        "date": "2026-10-20",
+        "affects": [
+          "process_857z",
+          "process_mrfm",
+          "sink_alxw"
+        ],
+        "context": "сетевая политика окружения закрыла справочные сайты; агенты видели только сниппеты поиска",
+        "rejected": "ждать доступа — работа стоит;\nпустые ячейки вместо оценок — дашборд без ответа на вопрос",
+        "costs": "числа не сверены с открытыми страницами; часть значений по памяти; читатель должен смотреть на conf",
+        "revisit": "как только откроются en/ru.wikipedia.org и webbook.nist.gov — перезапустить агентов и снять метки «по памяти»"
+      },
+      "notes": ""
+    },
+    {
+      "id": "decision_z0tu",
+      "type": "decision",
+      "name": "Решение: словарь отраслей",
+      "x": 40,
+      "y": 334,
+      "enabled": true,
+      "params": {
+        "status": "accepted",
+        "title": "отрасли только из фиксированного словаря",
+        "date": "2026-10-20",
+        "affects": [
+          "agent_l5uf",
+          "process_mrfm"
+        ],
+        "context": "матрица «семейство × отрасль» и фильтр по отрасли требуют одинаковых названий у всех агентов",
+        "rejected": "свободный текст — шесть агентов дали бы шесть написаний одной отрасли",
+        "costs": "узкие ниши уходят в ближайшую отрасль словаря",
+        "revisit": "если в одной отрасли окажется больше двух третей семейств — дробить её"
+      },
+      "notes": ""
+    },
+    {
+      "id": "decision_10u94",
+      "type": "decision",
+      "name": "Решение: кипение > 5000 °C в тексте",
+      "x": 40,
+      "y": 40,
+      "enabled": true,
+      "params": {
+        "status": "accepted",
+        "title": "экстремальные температуры — только в подписи, не на шкале",
+        "date": "2026-10-20",
+        "affects": [
+          "process_857z"
+        ],
+        "context": "кипение WC ≈6000 °C растягивало шкалу графика фаз вдвое",
+        "rejected": "логарифмическая шкала — для °C она вводит в заблуждение и ломает 25 °C и отрицательные значения",
+        "costs": "у WC на полосе нет точки кипения, значение только в подсказке",
+        "revisit": "если таких семейств станет больше двух — отдельная шкала или обрыв оси"
+      },
+      "notes": ""
+    },
+    {
+      "id": "output_11vxp",
+      "type": "output",
+      "name": "Итог: ссылка на дашборд",
+      "x": 2210,
+      "y": 1494,
+      "enabled": true,
+      "params": {
+        "target": "console",
+        "format": "json",
+        "append": false
+      },
+      "notes": "Конец конвейера: в отчёт прогона — ссылка на дашборд и версии датасетов (ctx.phase_states_ver, ctx.applications_ver)."
     }
   ],
   "edges": [
@@ -655,7 +1109,19 @@
         "port": "in"
       },
       "kind": "flow"
+    },
+    {
+      "id": "e_12ol8",
+      "from": {
+        "node": "sink_alxw",
+        "port": "out"
+      },
+      "to": {
+        "node": "output_11vxp",
+        "port": "in"
+      },
+      "kind": "flow"
     }
   ],
-  "seq": 29
+  "seq": 39
 }

@@ -69,11 +69,17 @@ window.Build = (function () {
   const statusOk = s => STATUSES.some(([v]) => v === s);
   const label = s => (STATUSES.find(([v]) => v === s) || [, s])[1];
 
+  /* Копия в памяти — на случай, когда localStorage переполнен: запись в него
+     молча не проходит, и без копии стройка, принятая с диска, терялась бы при
+     первом же открытии проекта. Память свежее хранилища: пишем в неё всегда. */
+  const mem = {};
   function readLS(id) {
+    if (mem[id]) return normalize(mem[id], id);
     try { return normalize(JSON.parse(localStorage.getItem(LS + id) || 'null'), id); }
     catch (e) { return blank(id); }
   }
   function writeLS(id, st) {
+    mem[id] = st;
     try { localStorage.setItem(LS + id, JSON.stringify(st)); } catch (e) {}
   }
 
@@ -354,7 +360,7 @@ window.Build = (function () {
     if (mtimeMs) diskMtime[id] = mtimeMs / 1000;   // движок считает в секундах
     const disk = normalize(raw, id);
     if (!Object.keys(disk.nodes).length && !disk.root) return false;
-    const local = localStorage.getItem(LS + id) ? readLS(id) : null;
+    const local = (mem[id] || localStorage.getItem(LS + id)) ? readLS(id) : null;
     if (local && !((mtimeMs || 0) > (local.updatedAt || 0) + FRESH_MS)) return false;
     writeLS(id, disk);
     if (id === pid) { state = disk; invalidate(); }
@@ -366,6 +372,7 @@ window.Build = (function () {
      удалённого обратно на диск и стройка воскреснет. */
   function drop(id) {
     if (id === pid) { clearTimeout(timer); pid = null; state = blank(null); invalidate(); }
+    delete mem[id];
     try { localStorage.removeItem(LS + id); } catch (e) {}
   }
 

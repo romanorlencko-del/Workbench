@@ -52,13 +52,33 @@ window.App = (function () {
   /* ── проекты: несколько планов в localStorage, быстрое переключение ── */
   function saveNow() {
     if (!projectId) return;
-    try {
-      const snap = snapshot();
-      localStorage.setItem(LS_PROJECT + projectId, snap);
-      localStorage.setItem(LS_CURRENT, projectId);
-      touchRegistry(projectId, window.Graph.state.name || 'Без имени');
-      diskPut(projectId, snap);          // зеркалим на диск: правки переживут даже очистку localStorage
-    } catch (e) {}
+    let snap;
+    try { snap = snapshot(); } catch (e) { return; }
+    planPut(projectId, snap);
+    lsSet(LS_CURRENT, projectId);
+    touchRegistry(projectId, window.Graph.state.name || 'Без имени');
+    diskPut(projectId, snap);          // зеркалим на диск: правки переживут даже очистку localStorage
+  }
+
+  /* Переполненный localStorage. Раньше запись падала молча: проект с диска не
+     попадал в список, а saveNow обрывался ДО записи на диск — правки пропадали
+     отовсюду. Теперь планы держим ещё и в памяти (planCache), диск пишем всегда,
+     а о переполнении говорим вслух один раз за сеанс. */
+  const planCache = {};                // id → строка плана, свежее localStorage
+  function planGet(id) { return planCache[id] || localStorage.getItem(LS_PROJECT + id); }
+  function planPut(id, str) { planCache[id] = str; return lsSet(LS_PROJECT + id, str, 'план ' + id); }
+  let storageWarned = false;
+  function lsSet(key, value, what) {
+    try { localStorage.setItem(key, value); return true; }
+    catch (e) {
+      if (window.Doctor) window.Doctor.log('warn', 'хранилище', 'localStorage переполнен: не записалось ' + (what || key), e.message);
+      if (!storageWarned) {
+        storageWarned = true;
+        setTimeout(() => toast('Хранилище браузера переполнено: проекты читаются и сохраняются через диск (папка projects). ' +
+                               'Освободите место — удалите старые проекты или историю их чатов.', 'warn'), 0);
+      }
+      return false;
+    }
   }
 
   /* ── зеркало планов на диск через движок (serve.py, /api) ────────────
@@ -90,7 +110,7 @@ window.App = (function () {
   function reconcileDisk(id, d) {
     if (!d || !d.data || !Array.isArray(d.data.nodes)) return;
     if (d.mtime) diskMtime[id] = d.mtime;
-    try { localStorage.setItem(LS_PROJECT + id, JSON.stringify(d.data)); } catch (e) {}
+    planPut(id, JSON.stringify(d.data));
     const reg = loadRegistry(), p = reg.find(x => x.id === id);
     if (p) { p.name = d.data.name || p.name; p.updatedAt = (d.mtime || 0) * 1000; saveRegistry(reg); }
     if (id === projectId) {
@@ -141,7 +161,7 @@ window.App = (function () {
       const diskMs = (f.mtime || 0) * 1000;
       try {
         if (!local) {                                     // нет в браузере — восстановить с диска
-          localStorage.setItem(LS_PROJECT + f.id, JSON.stringify(f.plan));
+          planPut(f.id, JSON.stringify(f.plan));          // не влез в localStorage — откроется из памяти
           const e = { id: f.id, name: f.plan.name || 'Без имени', updatedAt: diskMs };
           reg.push(e); byId.set(f.id, e); changed = true;
         } else {
@@ -151,23 +171,34 @@ window.App = (function () {
              ревизию: она назад не ходит, и более поздняя всегда побеждает. */
           const revOf = p => { const r = p && p.meta ? Number(p.meta.rev) : NaN; return Number.isFinite(r) ? r : null; };
           let localPlan = null;
-          try { localPlan = JSON.parse(localStorage.getItem(LS_PROJECT + f.id) || 'null'); } catch (e) {}
+          try { localPlan = JSON.parse(planGet(f.id) || 'null'); } catch (e) {}
           const dr = revOf(f.plan), lr = revOf(localPlan);
           const revWins = dr !== null && lr !== null && dr > lr;
           const timeWins = dr === null || lr === null ? diskMs > (local.updatedAt || 0) + 2000 : false;
-          if (revWins || timeWins) {
-            localStorage.setItem(LS_PROJECT + f.id, JSON.stringify(f.plan));
+          /* В списке есть, а плана в браузере нет (хранилище чистили или оно
+             переполнилось): сравнивать не с чем — берём диск, иначе проект
+             виден в списке, но не открывается. */
+          const lost = !localPlan;
+          if (revWins || timeWins || lost) {
+            if (!planPut(f.id, JSON.stringify(f.plan)))
+              try { localStorage.removeItem(LS_PROJECT + f.id); } catch (e) {}   // старая копия не должна перебить свежую
             local.name = f.plan.name || local.name; local.updatedAt = diskMs; changed = true;
             if (revWins && window.Doctor)
               window.Doctor.log('info', 'диск', `взял версию с диска: ревизия ${dr} против ${lr} в этой вкладке`, f.id);
+            if (lost && window.Doctor)
+              window.Doctor.log('warn', 'диск', 'плана не было в браузере — взял с диска', f.id);
           }
         }
       } catch (e) {}
     });
     if (changed) saveRegistry(reg);
   }
-  function loadRegistry() { try { return JSON.parse(localStorage.getItem(LS_PROJECTS) || '[]') || []; } catch (e) { return []; } }
-  function saveRegistry(list) { try { localStorage.setItem(LS_PROJECTS, JSON.stringify(list)); } catch (e) {} }
+  let regMem = null;                   // реестр, не влезший в localStorage
+  function loadRegistry() {
+    if (regMem) return JSON.parse(JSON.stringify(regMem));
+    try { return JSON.parse(localStorage.getItem(LS_PROJECTS) || '[]') || []; } catch (e) { return []; }
+  }
+  function saveRegistry(list) { regMem = lsSet(LS_PROJECTS, JSON.stringify(list), 'список проектов') ? null : list; }
   function newId() { return 'p_' + Date.now().toString(36) + Math.floor(Math.random() * 46656).toString(36); }
   function touchRegistry(id, name) {
     const list = loadRegistry();
@@ -222,7 +253,7 @@ window.App = (function () {
       document.getElementById('pipeline-name').value = name;
       saveNow();                                   // план текущего — с новым именем
     } else {
-      try { const raw = localStorage.getItem(LS_PROJECT + id); if (raw) { const d = JSON.parse(raw); d.name = name; const s = JSON.stringify(d); localStorage.setItem(LS_PROJECT + id, s); diskPut(id, s); } } catch (e) {}
+      try { const raw = planGet(id); if (raw) { const d = JSON.parse(raw); d.name = name; const s = JSON.stringify(d); planPut(id, s); diskPut(id, s); } } catch (e) {}
     }
     renderProjectSelect(true);
   }
@@ -370,7 +401,9 @@ window.App = (function () {
     window.addEventListener('resize', syncChatOverlap);
   }
   function loadProjectState(id) {
-    window.Graph.fromJSON(JSON.parse(localStorage.getItem(LS_PROJECT + id)));
+    const raw = planGet(id);
+    if (!raw) throw new Error('плана нет ни в браузере, ни на диске');
+    window.Graph.fromJSON(JSON.parse(raw));
     if (window.Harness) window.Harness.resetManual();
     projectId = id;
     window.Build.adopt(id);                      // у каждого проекта своя стройка
@@ -420,6 +453,7 @@ window.App = (function () {
     if (!confirm(`Удалить проект «${window.Graph.state.name}»? Необратимо.`)) return;
     const gone = projectId;
     projectId = null;                            // чтобы автосейв не воскресил удаляемый
+    delete planCache[gone];
     try { localStorage.removeItem(LS_PROJECT + gone); localStorage.removeItem(LS_CHAT + '.' + gone); localStorage.removeItem('tester.alias.' + gone); } catch (e) {}
     window.Build.drop(gone);                     // стройка удалённого проекта — туда же
     if (window.CheckState) window.CheckState.drop(gone);
@@ -1257,12 +1291,12 @@ window.App = (function () {
           return;
         }
         try {
-          const raw = localStorage.getItem(LS_PROJECT + pid); if (!raw) return;
+          const raw = planGet(pid); if (!raw) return;
           const o = JSON.parse(raw); o.meta = o.meta || {};
           if (o.meta.workdir === dir) return;
           o.meta.workdir = dir;
           const s = JSON.stringify(o);
-          localStorage.setItem(LS_PROJECT + pid, s); diskPut(pid, s); n++;
+          planPut(pid, s); diskPut(pid, s); n++;
         } catch (e) {}
       });
       commit(); refresh();
@@ -1580,13 +1614,13 @@ window.App = (function () {
     loadRegistry().forEach(p => {
       if (p.id === projectId) return;
       try {
-        const raw = localStorage.getItem(LS_PROJECT + p.id); if (!raw) return;
+        const raw = planGet(p.id); if (!raw) return;
         const d = JSON.parse(raw);
         d.meta = d.meta || {}; d.meta.models = d.meta.models || {};
         ['primary', 'heavy'].forEach(ref => {
           if (Object.keys(src[ref]).length) d.meta.models[ref] = Object.assign({}, d.meta.models[ref], src[ref]);
         });
-        const s = JSON.stringify(d); localStorage.setItem(LS_PROJECT + p.id, s); diskPut(p.id, s); n++;
+        const s = JSON.stringify(d); planPut(p.id, s); diskPut(p.id, s); n++;
       } catch (e) {}
     });
     saveGlobalModels(src);
@@ -2885,7 +2919,7 @@ window.App = (function () {
       try { const saved = localStorage.getItem(LS_KEY); if (saved) data = JSON.parse(saved); } catch (e) {}
       if (!data) data = JSON.parse(JSON.stringify(window.PIPELINE));
       const id = newId();
-      try { localStorage.setItem(LS_PROJECT + id, JSON.stringify(data)); } catch (e) {}
+      planPut(id, JSON.stringify(data));
       projectId = id;
       touchRegistry(id, data.name || 'Проект');
       localStorage.setItem(LS_CURRENT, id);
@@ -2894,7 +2928,7 @@ window.App = (function () {
     const curId = localStorage.getItem(LS_CURRENT);
     projectId = registry.find(p => p.id === curId) ? curId
               : registry.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0].id;
-    try { window.Graph.fromJSON(JSON.parse(localStorage.getItem(LS_PROJECT + projectId))); }
+    try { window.Graph.fromJSON(JSON.parse(planGet(projectId))); }
     catch (e) { window.Graph.fromJSON(window.PIPELINE); }
     window.Build.adopt(projectId);         // стройка текущего проекта — после подхвата с диска
     if (window.CheckState) window.CheckState.adopt(projectId);   // и чек-лист: иначе отметки некуда писать

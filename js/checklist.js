@@ -189,7 +189,11 @@
 
   const blank = () => ({ version: 1, profile: 'все', items: {}, custom: [], updatedAt: 0 });
 
+  /* Копия в памяти: при переполненном localStorage запись молча не проходит,
+     и отметки, принятые с диска, иначе терялись бы при открытии проекта. */
+  const mem = {};
   function load(id) {
+    if (mem[id]) return mem[id];
     try { return JSON.parse(localStorage.getItem(LS + id) || 'null') || blank(); }
     catch (e) { return blank(); }
   }
@@ -197,6 +201,7 @@
     if (!pid || !state) return;
     state.updatedAt = Date.now();
     const raw = JSON.stringify(state);
+    mem[pid] = state;
     try { localStorage.setItem(LS + pid, raw); } catch (e) {}
     /* на диск — best-effort: движок может быть выключен, это не повод шуметь */
     if (location.protocol === 'http:' || location.protocol === 'https:') {
@@ -293,10 +298,11 @@
       if (!id || !data || typeof data !== 'object') return;
       const local = load(id);
       if ((local.updatedAt || 0) >= (ms || 0)) return;      // своё свежее — не трогаем
+      mem[id] = data;
       try { localStorage.setItem(LS + id, JSON.stringify(data)); } catch (e) {}
       if (id === pid) { state = data; listeners.forEach(f => { try { f(); } catch (e) {} }); }
     },
-    drop(id) { try { localStorage.removeItem(LS + id); } catch (e) {} },
+    drop(id) { delete mem[id]; try { localStorage.removeItem(LS + id); } catch (e) {} },
     /* Пакетная отметка одной кнопкой. Поштучно это было бы под сотню записей на
        диск подряд, поэтому сохраняем один раз в конце.
        Уже проработанное «отметить всё» НЕ откатывает: иначе кнопка удобства
